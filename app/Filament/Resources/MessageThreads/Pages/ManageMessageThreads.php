@@ -1,0 +1,2 @@
+<?php
+namespace App\Filament\Resources\MessageThreads\Pages; use App\Filament\Resources\MessageThreads\MessageThreadResource; use Filament\Actions\CreateAction; use Filament\Resources\Pages\ManageRecords; class ManageMessageThreads extends ManageRecords { protected static string $resource=MessageThreadResource::class; protected function getHeaderActions():array{return [CreateAction::make()->visible(fn()=>auth()->user()?->can('notifications.send')??false)];} }

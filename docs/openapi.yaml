@@ -1,0 +1,183 @@
+openapi: 3.0.3
+info:
+  title: FOSER Portal API
+  version: 1.0.0
+  description: Versioned REST API for the FOSER portal.
+servers:
+  - url: /api/v1
+security:
+  - sanctumBearer: []
+paths:
+  /auth/login:
+    post:
+      security: []
+      summary: Create a Sanctum token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '201': { description: Token created }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /auth/me:
+    get:
+      summary: Current authenticated user
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    delete:
+      summary: Revoke the current token
+      responses:
+        '204': { description: Token revoked }
+  /{resource}:
+    parameters:
+      - $ref: '#/components/parameters/Resource'
+    get:
+      summary: Paginated resource collection
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/Direction' }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /{resource}/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Resource' }
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      summary: Retrieve a resource
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Resource not found }
+  /statistics:
+    get:
+      summary: Dashboard statistics
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /statistics/regions:
+    get:
+      security: []
+      summary: Public aggregated statistics by region
+      parameters:
+        - { name: year, in: query, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /search:
+    get:
+      security: []
+      summary: Search published public FOSER content
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 100 } }
+        - { name: type, in: query, schema: { type: string, enum: [news, call, program, document, event, partner, testimonial] } }
+        - { $ref: '#/components/parameters/Page' }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /events:
+    get:
+      security: []
+      summary: List published events
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+  /partners:
+    get:
+      security: []
+      summary: List published partners
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+  /testimonials:
+    get:
+      security: []
+      summary: List published consented testimonials
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+  /assistant/ask:
+    post:
+      security: []
+      summary: Answer from public FOSER sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestion'
+      responses:
+        '200': { $ref: '#/components/responses/AssistantResponse' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /documents/{id}/download:
+    get:
+      summary: Securely download a published document
+      responses:
+        '200': { description: File stream }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Document is unavailable }
+components:
+  securitySchemes:
+    sanctumBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+  parameters:
+    Resource: { name: resource, in: path, required: true, schema: { type: string, enum: [students, universities, researchers, programs, calls, applications, documents, evaluations, research-projects, payments, notifications, claims] } }
+    Id: { name: id, in: path, required: true, schema: { type: string } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PerPage: { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    Search: { name: search, in: query, schema: { type: string, maxLength: 100 } }
+    Sort: { name: sort, in: query, schema: { type: string } }
+    Direction: { name: direction, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+    ApiResponse:
+      type: object
+      properties:
+        data: {}
+        meta: { type: object }
+    AssistantQuestion:
+      type: object
+      required: [question]
+      properties:
+        question: { type: string, minLength: 3, maxLength: 1000 }
+    AssistantResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            answer: { type: string, nullable: true }
+            confidence: { type: number, format: float }
+            refused: { type: boolean }
+            sources: { type: array, items: { type: object } }
+  responses:
+    Collection:
+      description: Standard paginated response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+    SingleResource:
+      description: Standard resource response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+    Unauthorized: { description: Authentication required }
+    Forbidden: { description: Insufficient permission }
+    ValidationError: { description: Validation failed }

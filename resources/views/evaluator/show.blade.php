@@ -1,0 +1,8 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Évaluation | FOSER</title>@vite(['resources/css/app.css','resources/js/app.js'])</head><body class="student-body"><main class="shell student-main"><a href="{{ route('evaluator.dashboard') }}">← Candidatures attribuées</a><h1>{{ $record->project_title ?: 'Candidature '.$record->reference }}</h1>@if($evaluation->status === 'submitted' || $evaluation->conflict_declared)<div class="notice">Cette évaluation est verrouillée.</div>@else<form method="POST" action="{{ route('evaluator.applications.evaluation', $record->id) }}" class="student-panel">
+@csrf
+@foreach($criteria as $criterion)
+<label>{{ $criterion->name }} / {{ $criterion->maximum_score }}<input type="number" name="scores[{{ $criterion->id }}]" min="0" max="{{ $criterion->maximum_score }}" step="0.01" value="{{ $scores[$criterion->id] ?? '' }}" required></label>
+@endforeach
+<label>Commentaire<textarea name="comment"></textarea></label><button class="button button-lime" type="submit">Soumettre l'évaluation</button></form><form method="POST" action="{{ route('evaluator.applications.conflict', $record->id) }}" class="student-panel">
+@csrf
+<label>Motif du conflit<textarea name="reason" required></textarea></label><button class="button button-dark" type="submit">Déclarer un conflit</button></form>@endif</main></body></html>

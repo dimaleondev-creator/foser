@@ -1,0 +1,2 @@
+@extends('researcher.layout')
+@section('content')<div class="student-welcome"><div><p class="eyebrow">CONVENTIONS</p><h1>Conventions validées</h1></div></div><section class="student-panel">@forelse($conventions as $convention)<div class="application-item"><div><strong>{{ $convention->title }}</strong><small>{{ $convention->reference }}</small></div><span>{{ $convention->status }} · {{ $convention->signed_at ?: 'Date non renseignée' }}</span></div>@empty<p>Aucune convention validée.</p>@endforelse</section>@endsection

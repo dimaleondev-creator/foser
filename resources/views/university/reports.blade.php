@@ -1,0 +1,2 @@
+@extends('university.layout')
+@section('content')<div class="student-welcome"><div><p class="eyebrow">PILOTAGE</p><h1>Rapports et statistiques</h1></div></div><section class="student-panel"><div class="stats-grid"><div><strong>{{ $stats['students'] }}</strong><span>Étudiants</span></div><div><strong>{{ $stats['validated_students'] }}</strong><span>Étudiants validés</span></div><div><strong>{{ $stats['applications'] }}</strong><span>Dossiers</span></div><div><strong>{{ $stats['validated_applications'] }}</strong><span>Dossiers validés</span></div></div></section>@endsection

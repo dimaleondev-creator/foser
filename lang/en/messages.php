@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'language' => 'Language',
+    'french' => 'Français',
+    'english' => 'English',
+    'home' => 'Home',
+    'dashboard' => 'Dashboard',
+    'profile' => 'Profile',
+    'applications' => 'My applications',
+    'programs' => 'Programs',
+    'documents' => 'Documents',
+    'payments' => 'Payments',
+    'messages' => 'Messages',
+    'notifications' => 'Notifications',
+    'logout' => 'Log out',
+    'login' => 'Sign in',
+    'register' => 'Register',
+    'save' => 'Save',
+    'cancel' => 'Cancel',
+    'published' => 'Published',
+    'draft' => 'Draft',
+    'archived' => 'Archived',
+    'email_unique' => 'This email address is already in use.',
+];

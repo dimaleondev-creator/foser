@@ -1,0 +1,14 @@
+.organization-shell { padding: 70px 0 100px; overflow-x:auto; }
+.organization-node { margin: 0 auto; width: min(100%, 360px); position: relative; }
+.organization-card { display:flex; align-items:center; gap:14px; padding:18px; background:var(--paper); border:1px solid var(--line); position:relative; }
+.organization-card img { width:54px; height:54px; object-fit:cover; border-radius:50%; flex:none; }
+.organization-copy { min-width:0; }
+.organization-copy h2 { font-size:18px; letter-spacing:-.02em; line-height:1.1; }
+.organization-copy p { margin:6px 0 0; color:var(--orange); font-size:11px; font-weight:700; }
+.organization-copy small { display:block; margin-top:8px; color:var(--muted); font-size:11px; }
+.organization-bio { margin-top:9px; color:var(--muted); font-size:12px; line-height:1.45; }
+.organization-card button { margin-left:auto; width:30px; height:30px; border:1px solid var(--line); background:var(--lime); color:var(--ink); font-size:20px; cursor:pointer; flex:none; }
+.organization-children { display:none; margin:18px 0 0 32px; padding-left:25px; border-left:1px solid var(--line); }
+.organization-node.is-expanded > .organization-children { display:grid; gap:18px; }
+.organization-node.is-expanded > .organization-card button { transform:rotate(45deg); }
+@media (min-width: 760px) { .organization-shell > .organization-node { width:360px; } .organization-shell > .organization-node > .organization-children { margin-left:-390px; padding-left:0; border-left:0; grid-template-columns:repeat(2, 360px); gap:24px 30px; } }

@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'language' => 'Langue',
+    'french' => 'Français',
+    'english' => 'English',
+    'home' => 'Accueil',
+    'dashboard' => 'Tableau de bord',
+    'profile' => 'Profil',
+    'applications' => 'Mes dossiers',
+    'programs' => 'Programmes',
+    'documents' => 'Documents',
+    'payments' => 'Paiements',
+    'messages' => 'Messagerie',
+    'notifications' => 'Notifications',
+    'logout' => 'Déconnexion',
+    'login' => 'Se connecter',
+    'register' => "S'inscrire",
+    'save' => 'Enregistrer',
+    'cancel' => 'Annuler',
+    'published' => 'Publié',
+    'draft' => 'Brouillon',
+    'archived' => 'Archivé',
+    'email_unique' => 'Cette adresse email est déjà utilisée.',
+];

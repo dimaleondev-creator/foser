@@ -1,0 +1,4 @@
+<?php
+namespace App\Filament\Resources\Researchers;
+use App\Filament\Resources\BaseCrudResource; use App\Filament\Resources\Researchers\Pages\ManageResearchers; use App\Models\Researcher; use BackedEnum;
+class ResearcherResource extends BaseCrudResource { protected static ?string $model=Researcher::class; protected static string|BackedEnum|null $navigationIcon='heroicon-o-user-group'; protected static ?string $navigationLabel='Chercheurs'; protected static string $permission='research.view'; protected static array $fields=[['name'=>'user_id','required'=>true],['name'=>'researcher_number','required'=>true],['name'=>'registration_reference'],['name'=>'status','required'=>true],['name'=>'orcid'],['name'=>'speciality'],['name'=>'research_domain'],['name'=>'academic_rank'],['name'=>'phone'],['name'=>'university_id'],['name'=>'laboratory_id']]; public static function getPages():array{return ['index'=>ManageResearchers::route('/')];} }

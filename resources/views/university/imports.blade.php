@@ -1,0 +1,2 @@
+@extends('university.layout')
+@section('content')<div class="student-welcome"><div><p class="eyebrow">IMPORTS</p><h1>Historique des imports</h1></div></div><section class="student-panel">@forelse($imports as $import)<div class="application-item"><div><strong>{{ $import->filename }}</strong><small>{{ $import->created_at }}</small></div><span>{{ $import->imported_count }} importés · {{ $import->updated_count }} mis à jour · {{ $import->rejected_count }} rejetés · {{ $import->error_count }} erreurs</span></div>@empty<p>Aucun import effectué.</p>@endforelse</section>@endsection

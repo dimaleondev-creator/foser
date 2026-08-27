@@ -1,0 +1,4 @@
+<?php
+namespace App\Filament\Resources\PressReleases;
+use App\Filament\Resources\BaseCrudResource; use App\Filament\Resources\PressReleases\Pages\ManagePressReleases; use App\Models\PressRelease; use BackedEnum;
+class PressReleaseResource extends BaseCrudResource { protected static ?string $model=PressRelease::class; protected static string|BackedEnum|null $navigationIcon='heroicon-o-megaphone'; protected static ?string $navigationLabel='Communiqués'; protected static string $permission='content.view'; protected static array $fields=[['name'=>'title','required'=>true],['name'=>'slug','required'=>true],['name'=>'body','type'=>'textarea','required'=>true],['name'=>'status','required'=>true],['name'=>'published_at','type'=>'date']]; public static function getPages():array{return ['index'=>ManagePressReleases::route('/')];} }

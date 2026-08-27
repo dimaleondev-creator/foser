@@ -1,0 +1,109 @@
+services:
+  app:
+    build: { context: ., dockerfile: Dockerfile }
+    image: foser-portal:${APP_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - app_storage:/var/www/html/storage
+      - public_assets:/var/www/html/public
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9000 || php artisan about --only=environment >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging: &default-logging
+      driver: json-file
+      options: { max-size: 10m, max-file: "5" }
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - public_assets:/var/www/html/public:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_CERT_DIR:-./docker/nginx/certs}:/etc/nginx/certs:ro
+    depends_on:
+      app: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+
+  queue:
+    image: foser-portal:${APP_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    command: ["php", "artisan", "queue:work", "redis", "--queue=default", "--sleep=3", "--tries=3", "--timeout=90", "--max-time=3600"]
+    volumes: ["app_storage:/var/www/html/storage"]
+    depends_on:
+      app: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    stop_grace_period: 30s
+    logging: *default-logging
+
+  scheduler:
+    image: foser-portal:${APP_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    command: ["php", "artisan", "schedule:work"]
+    volumes: ["app_storage:/var/www/html/storage"]
+    depends_on:
+      app: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    logging: *default-logging
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?DB_DATABASE is required}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    env_file: .env
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging: *default-logging
+
+  backup:
+    build: { context: ., dockerfile: docker/backup/Dockerfile }
+    image: foser-backup:${APP_VERSION:-latest}
+    profiles: [backup]
+    env_file: .env
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+      - app_storage:/var/www/html/storage:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      app: { condition: service_healthy }
+    restart: "no"
+    logging: *default-logging
+
+volumes:
+  app_storage:
+  public_assets:
+  postgres_data:
+  redis_data:

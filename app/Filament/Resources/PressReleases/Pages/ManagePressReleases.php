@@ -1,0 +1,2 @@
+<?php
+namespace App\Filament\Resources\PressReleases\Pages; use App\Filament\Resources\PressReleases\PressReleaseResource; use Filament\Actions\CreateAction; use Filament\Resources\Pages\ManageRecords; class ManagePressReleases extends ManageRecords { protected static string $resource=PressReleaseResource::class; protected function getHeaderActions():array{return [CreateAction::make()->visible(fn()=>auth()->user()?->can('content.create')??false)];} }

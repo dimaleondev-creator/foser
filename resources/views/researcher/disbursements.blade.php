@@ -1,0 +1,2 @@
+@extends('researcher.layout')
+@section('content')<div class="student-welcome"><div><p class="eyebrow">FINANCEMENT</p><h1>Décaissements autorisés</h1></div></div><section class="student-panel">@forelse($disbursements as $disbursement)<div class="application-item"><div><strong>{{ $disbursement->reference }}</strong><small>Échéance: {{ $disbursement->scheduled_for ?: 'Non planifiée' }}</small></div><span>{{ number_format($disbursement->amount, 2, ',', ' ') }} · {{ $disbursement->status }}</span></div>@empty<p>Aucun décaissement autorisé.</p>@endforelse</section>@endsection

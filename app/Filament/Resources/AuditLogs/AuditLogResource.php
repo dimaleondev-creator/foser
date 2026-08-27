@@ -1,0 +1,4 @@
+<?php
+namespace App\Filament\Resources\AuditLogs;
+use App\Filament\Resources\BaseCrudResource; use App\Filament\Resources\AuditLogs\Pages\ManageAuditLogs; use App\Models\AuditLog; use BackedEnum;
+class AuditLogResource extends BaseCrudResource { protected static ?string $model=AuditLog::class; protected static string|BackedEnum|null $navigationIcon='heroicon-o-shield-check'; protected static ?string $navigationLabel='Journal d’audit'; protected static string $permission='audit.view'; protected static array $fields=[['name'=>'event','required'=>true],['name'=>'auditable_type','required'=>true],['name'=>'auditable_id'],['name'=>'user_id'],['name'=>'old_values','type'=>'textarea'],['name'=>'new_values','type'=>'textarea']]; public static function getPages():array{return ['index'=>ManageAuditLogs::route('/')];} }

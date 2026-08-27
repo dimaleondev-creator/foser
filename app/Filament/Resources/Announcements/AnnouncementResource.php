@@ -1,0 +1,4 @@
+<?php
+namespace App\Filament\Resources\Announcements;
+use App\Filament\Resources\BaseCrudResource; use App\Filament\Resources\Announcements\Pages\ManageAnnouncements; use App\Models\Announcement; use BackedEnum;
+class AnnouncementResource extends BaseCrudResource { protected static ?string $model=Announcement::class; protected static string|BackedEnum|null $navigationIcon='heroicon-o-bell-alert'; protected static ?string $navigationLabel='Annonces'; protected static string $permission='content.view'; protected static array $fields=[['name'=>'title','required'=>true],['name'=>'body','type'=>'textarea','required'=>true],['name'=>'audience','required'=>true],['name'=>'starts_at','type'=>'date'],['name'=>'ends_at','type'=>'date'],['name'=>'status','required'=>true]]; public static function getPages():array{return ['index'=>ManageAnnouncements::route('/')];} }

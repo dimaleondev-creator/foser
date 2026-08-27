@@ -1,0 +1,4 @@
+<?php
+namespace App\Filament\Resources\SystemSettings;
+use App\Filament\Resources\BaseCrudResource; use App\Filament\Resources\SystemSettings\Pages\ManageSystemSettings; use App\Models\SystemSetting; use BackedEnum;
+class SystemSettingResource extends BaseCrudResource { protected static ?string $model=SystemSetting::class; protected static string|BackedEnum|null $navigationIcon='heroicon-o-cog-6-tooth'; protected static ?string $navigationLabel='Paramètres système'; protected static string $permission='settings.manage'; protected static array $fields=[['name'=>'key','required'=>true],['name'=>'value','type'=>'textarea'],['name'=>'type','required'=>true],['name'=>'is_public','type'=>'select','options'=>[true=>'Oui',false=>'Non']]]; public static function getPages():array{return ['index'=>ManageSystemSettings::route('/')];} }

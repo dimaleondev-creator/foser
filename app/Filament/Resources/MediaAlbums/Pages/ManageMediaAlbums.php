@@ -1,0 +1,2 @@
+<?php
+namespace App\Filament\Resources\MediaAlbums\Pages; use App\Filament\Resources\MediaAlbums\MediaAlbumResource; use Filament\Actions\CreateAction; use Filament\Resources\Pages\ManageRecords; class ManageMediaAlbums extends ManageRecords { protected static string $resource=MediaAlbumResource::class; protected function getHeaderActions():array{return [CreateAction::make()->visible(fn()=>auth()->user()?->can('content.create')??false)];} }
