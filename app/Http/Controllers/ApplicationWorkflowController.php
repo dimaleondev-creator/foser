@@ -63,8 +63,7 @@ class ApplicationWorkflowController extends Controller
     public function commit(Request $request, string $application, ApplicationWorkflowService $workflow): RedirectResponse
     {
         $data = $request->validate(['amount' => ['required', 'numeric', 'min:0'], 'currency' => ['nullable', 'string', 'size:3']]);
-        $workflow->sendToFinance($request->user(), $application);
-        $workflow->createFinancialCommitment($request->user(), $application, (float) $data['amount'], $data['currency'] ?? 'GNF');
+        $workflow->createFinancialCommitment($request->user(), $application, (float) $data['amount'], $data['currency'] ?? 'FCFA');
         return back()->with('status', 'Engagement financier créé.');
     }
 

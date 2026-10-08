@@ -13,7 +13,7 @@ class ApplicationsDistributionChart extends ChartWidget
     protected function getType(): string { return 'bar'; }
     protected function getData(): array
     {
-        $rows = app(DashboardStatisticsService::class)->charts(request()->only(['year', 'region', 'university_id', 'program_id', 'sex', 'status']), 20)['statuses'];
+        $rows = app(DashboardStatisticsService::class)->charts(request()->only(['year', 'from', 'to', 'region', 'university_id', 'program_id', 'sex', 'status']), 20)['statuses'];
         return ['labels' => array_column($rows, 'label'), 'datasets' => [['label' => 'Dossiers', 'data' => array_column($rows, 'total')]]];
     }
 }

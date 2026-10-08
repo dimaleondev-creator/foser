@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::table('calls', function (Blueprint $table): void {
             $table->unsignedInteger('places')->nullable()->after('description');
             $table->decimal('amount', 15, 2)->nullable()->after('places');
-            $table->string('currency', 3)->default('GNF')->after('amount');
+            $table->string('currency', 4)->default('FCFA')->after('amount');
             $table->text('conditions')->nullable()->after('currency');
             $table->text('required_documents')->nullable()->after('conditions');
             $table->json('eligibility_roles')->nullable()->after('conditions');

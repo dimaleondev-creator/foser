@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\DashboardStatisticsService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -43,6 +44,9 @@ class DashboardAccessTest extends TestCase
         ];
 
         foreach ($roles as [$role, $path]) {
+            if ($role === 'directeur_general') {
+                Auth::logout();
+            }
             $user = User::factory()->create(['account_type' => $role, 'status' => 'active']);
             $this->actingAs($user)->get($path)->assertOk();
             $this->actingAs($user)->get('/student')->assertForbidden();

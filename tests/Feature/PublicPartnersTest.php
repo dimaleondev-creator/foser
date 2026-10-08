@@ -3,12 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\Partner;
+use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PublicPartnersTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RolesAndPermissionsSeeder::class);
+    }
 
     public function test_public_partners_lists_active_published_partners_only(): void
     {
@@ -26,6 +34,19 @@ class PublicPartnersTest extends TestCase
 
         $this->get(route('partners.index', ['q' => 'recherche']))->assertOk()->assertSee($partner->name)->assertDontSee('Fondation éducation');
         $this->get(route('partners.show', $partner->slug))->assertOk()->assertSee($partner->name)->assertSee($partner->description);
+    }
+
+    public function test_director_can_reach_partner_list_and_page_has_sticky_navigation_and_footer(): void
+    {
+        $director = User::factory()->create(['account_type' => 'directeur_general', 'status' => 'active']);
+        $partner = Partner::create(['name' => 'Institut partenaire', 'slug' => 'institut-partenaire', 'status' => 'published']);
+
+        $this->actingAs($director)->get(route('directeur_general.dashboard'))
+            ->assertOk()->assertSee(route('partners.index'));
+        $this->get(route('partners.index'))
+            ->assertOk()->assertSee($partner->name)->assertSee('partner-header', false)
+            ->assertSee('Tableau de direction')->assertSee('partner-footer', false)
+            ->assertSee('Tous les partenaires');
     }
 
     public function test_draft_partner_detail_is_not_public(): void

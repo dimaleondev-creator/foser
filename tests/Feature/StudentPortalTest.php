@@ -3,13 +3,17 @@
 namespace Tests\Feature;
 
 use App\Enums\StudentApplicationStatus;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class StudentPortalTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_student_registration_page_is_available(): void
     {
-        $this->get('/student/register')->assertOk()->assertSee('Créer votre compte');
+        $this->get('/student/register')->assertOk()->assertSee('Créer votre compte')
+            ->assertSee('Pays ou lieu de naissance')->assertSee('name="birth_place"', false)->assertSee('maxlength="120" required', false);
     }
 
     public function test_student_login_page_is_available(): void

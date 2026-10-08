@@ -59,8 +59,7 @@ class ApplicationWorkflowApiController
     public function commit(Request $request, string $application, ApplicationWorkflowService $workflow): JsonResponse
     {
         $data = $request->validate(['amount' => ['required', 'numeric', 'min:0'], 'currency' => ['nullable', 'string', 'size:3']]);
-        $workflow->sendToFinance($request->user(), $application);
-        $commitment = $workflow->createFinancialCommitment($request->user(), $application, (float) $data['amount'], $data['currency'] ?? 'GNF');
+        $commitment = $workflow->createFinancialCommitment($request->user(), $application, (float) $data['amount'], $data['currency'] ?? 'FCFA');
         return response()->json(['data' => $commitment], 201);
     }
 

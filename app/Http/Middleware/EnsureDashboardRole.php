@@ -21,12 +21,21 @@ class EnsureDashboardRole
         if (in_array($currentRole, ['chercheur', 'researcher'], true)) {
             $profileStatus = DB::table('researcher_profiles')->where('user_id', $user->id)->value('status');
             if ($profileStatus === 'pending') {
+                if ($request->is('api/*') || $request->expectsJson()) {
+                    abort(403, 'Le compte chercheur est en attente de validation.');
+                }
                 return redirect()->route('researcher.pending');
             }
             if ($profileStatus === 'rejected') {
+                if ($request->is('api/*') || $request->expectsJson()) {
+                    abort(403, 'Le compte chercheur n’est pas autorisé.');
+                }
                 return redirect()->route('researcher.rejected');
             }
             if ($profileStatus === 'suspended' || in_array($user->status, ['suspended', 'disabled', 'inactive'], true)) {
+                if ($request->is('api/*') || $request->expectsJson()) {
+                    abort(403, 'Le compte chercheur est suspendu.');
+                }
                 return redirect()->route('researcher.suspended');
             }
         }

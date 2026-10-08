@@ -12,6 +12,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\Models\Role;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Models\University;
@@ -30,25 +34,39 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         });
 
         static::created(function (self $user): void {
-            $user->assignRole($user->account_type ?: 'etudiant');
+            $roleName = $user->account_type ?: 'etudiant';
+            if ($roleName === 'researcher' && ! Role::query()->where('name', $roleName)->where('guard_name', 'web')->exists()) {
+                $roleName = 'chercheur';
+            }
+            $user->assignRole($roleName);
 
-            if ($user->account_type !== 'etudiant' && auth()->check()) {
-                app(\App\Services\AccountInvitationService::class)->invite($user, auth()->user());
-            static::saving(function (self $user): void {
-                $actor = auth()->user();
+            if ($user->account_type !== 'etudiant' && Auth::check()) {
+                app(\App\Services\AccountInvitationService::class)->invite($user, Auth::user());
+            }
+        });
 
-                if (! $actor) {
-                    return;
-                }
+        static::saving(function (self $user): void {
+            $actor = Auth::user();
 
-                if ($user->exists && $actor->is($user) && $user->isDirty(['account_type', 'status', 'university_id'])) {
-                    throw new \Illuminate\Auth\Access\AuthorizationException('Vous ne pouvez pas modifier vos propres privilèges.');
-                }
+            if (! $actor) {
+                return;
+            }
 
-                if ($user->exists && ! $actor->hasRole('super_admin') && $user->isDirty('account_type') && in_array($user->account_type, ['super_admin', 'admin', 'directeur_general'], true)) {
+            if ($user->exists && $actor->id === $user->id && $user->isDirty(['account_type', 'status', 'university_id'])) {
+                throw new \Illuminate\Auth\Access\AuthorizationException('Vous ne pouvez pas modifier vos propres privilèges.');
+            }
+
+            if ($user->isDirty('account_type') && in_array($user->account_type, ['super_admin', 'admin', 'directeur_general'], true)) {
+                $isSuperAdmin = \Illuminate\Support\Facades\DB::table('model_has_roles')
+                    ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                    ->where('model_has_roles.model_id', $actor->id)
+                    ->where('model_has_roles.model_type', self::class)
+                    ->where('roles.name', 'super_admin')
+                    ->exists();
+
+                if (! $isSuperAdmin) {
                     throw new \Illuminate\Auth\Access\AuthorizationException('Seul un super administrateur peut attribuer ce rôle.');
                 }
-            });
             }
         });
 
@@ -71,10 +89,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function canAccessPanel(Panel $panel): bool
     {
         return $this->email_verified_at !== null
-            && ! in_array($this->status, ['suspended', 'disabled', 'inactive'], true) && $this->hasAnyPermission([
-            'users.view', 'applications.view', 'programs.view', 'content.view', 'reports.view',
-            'research.view', 'university.view',
-        ]);
+            && ! in_array($this->status, ['suspended', 'disabled', 'inactive'], true)
+            && in_array($this->account_type, [
+                'super_admin', 'admin', 'directeur_general', 'gestionnaire',
+                'agent_dossier', 'agent_finance', 'agent_recherche', 'agent_communication',
+            ], true);
     }
 
     public function getAppAuthenticationSecret(): ?string
@@ -114,6 +133,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'account_type',
         'status',
         'university_id',
+        'evaluation_expertise',
     ];
 
     /**
@@ -138,11 +158,22 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'password' => 'hashed',
             'app_authentication_secret' => 'encrypted',
             'app_authentication_recovery_codes' => 'encrypted:array',
+            'evaluation_expertise' => 'array',
         ];
     }
 
     public function university()
     {
         return $this->belongsTo(University::class);
+    }
+
+    public function studentProfile(): HasOne
+    {
+        return $this->hasOne(StudentProfile::class);
+    }
+
+    public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class, 'applicant_id');
     }
 }

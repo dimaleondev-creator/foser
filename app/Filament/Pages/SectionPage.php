@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 abstract class SectionPage extends Page
@@ -17,7 +18,7 @@ abstract class SectionPage extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasAnyPermission(static::$permissions) ?? false;
+        return Gate::any(static::$permissions);
     }
 
     public function getModuleName(): string
@@ -38,9 +39,18 @@ abstract class SectionPage extends Page
             'evaluations' => 'filament.admin.resources.evaluations.index',
             'resultats' => 'filament.admin.resources.application-results.index',
             'actualites' => 'filament.admin.resources.news.index',
+            'actualites et articles' => 'filament.admin.resources.news.index',
             'communiques' => 'filament.admin.resources.press-releases.index',
             'evenements' => 'filament.admin.resources.events.index',
             'newsletter' => 'filament.admin.resources.newsletter-subscribers.index',
+            'abonnes newsletter' => 'filament.admin.resources.newsletter-subscribers.index',
+            'campagnes newsletter' => 'filament.admin.resources.newsletter-campaigns.index',
+            'galeries photos' => 'filament.admin.resources.media-albums.index',
+            'videos' => 'filament.admin.resources.media.index',
+            'temoignages' => 'filament.admin.resources.testimonials.index',
+            'partenaires' => 'filament.admin.resources.partners.index',
+            'pages institutionnelles' => 'filament.admin.resources.cms-contents.index',
+            'messages de contact' => 'filament.admin.resources.contact-messages.index',
             'documents' => 'filament.admin.resources.documents.index',
             'categories' => 'filament.admin.resources.document-categories.index',
             'telechargements' => 'filament.admin.resources.downloads.index',
@@ -69,7 +79,8 @@ abstract class SectionPage extends Page
             'parametres' => 'filament.admin.resources.system-settings.index',
         ];
 
-        $key = mb_strtolower(trim(str_replace(['à', 'â', 'é', 'è', 'ê', 'ë', 'î', 'ï', 'ô', 'ù', 'û', 'ü', 'ç'], ['a', 'a', 'e', 'e', 'e', 'e', 'i', 'i', 'o', 'u', 'u', 'u', 'c'], $item)));
+        $normalizedItem = mb_strtolower(trim($item));
+        $key = str_replace(['à', 'â', 'é', 'è', 'ê', 'ë', 'î', 'ï', 'ô', 'ù', 'û', 'ü', 'ç'], ['a', 'a', 'e', 'e', 'e', 'e', 'i', 'i', 'o', 'u', 'u', 'u', 'c'], $normalizedItem);
 
         return isset($routes[$key]) && Route::has($routes[$key]) ? route($routes[$key]) : null;
     }

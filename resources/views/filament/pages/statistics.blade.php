@@ -1,0 +1,21 @@
+<x-filament-panels::page>
+@php($data = $this->getStatistics())
+<form method="GET" class="mb-6 grid gap-4 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-4 dark:border-white/10 dark:bg-gray-900">
+    <label class="text-sm">Année<input class="fi-input mt-1 w-full" type="number" name="year" value="{{ request('year') }}" min="2000" max="2100"></label>
+    <label class="text-sm">Du<input class="fi-input mt-1 w-full" type="date" name="from" value="{{ request('from') }}"></label>
+    <label class="text-sm">Au<input class="fi-input mt-1 w-full" type="date" name="to" value="{{ request('to') }}"></label>
+    <div class="flex items-end gap-2"><button class="fi-btn fi-btn-color-primary" type="submit">Filtrer</button><a class="fi-btn fi-btn-color-gray" href="{{ request()->url() }}">Réinitialiser</a></div>
+</form>
+<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+@foreach ([['Étudiants', $data['summary']['students']], ['Chercheurs', $data['summary']['researchers']], ['Universités', $data['summary']['universities']], ['Candidatures', $data['summary']['applications']], ['Bénéficiaires', $data['summary']['beneficiaries']], ['Programmes actifs', $data['summary']['active_programs']], ['Appels ouverts', $data['summary']['open_calls']], ['Projets financés', $data['summary']['funded_projects']]] as [$label, $value])
+<div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-900"><p class="text-sm text-gray-500">{{ $label }}</p><p class="mt-2 text-2xl font-semibold">{{ number_format($value, 0, ',', ' ') }}</p></div>
+@endforeach
+</div>
+<div class="mt-6 grid gap-6 xl:grid-cols-2">
+<section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-900"><h2 class="text-lg font-semibold">Situation financière</h2><dl class="mt-4 grid gap-3 sm:grid-cols-2"><div><dt class="text-sm text-gray-500">Engagé</dt><dd class="text-xl font-semibold">{{ number_format($data['summary']['committed'], 0, ',', ' ') }}</dd></div><div><dt class="text-sm text-gray-500">Décaissé</dt><dd class="text-xl font-semibold">{{ number_format($data['summary']['disbursed'], 0, ',', ' ') }}</dd></div><div><dt class="text-sm text-gray-500">Payé</dt><dd class="text-xl font-semibold">{{ number_format($data['summary']['paid'], 0, ',', ' ') }}</dd></div><div><dt class="text-sm text-gray-500">Solde</dt><dd class="text-xl font-semibold">{{ number_format($data['summary']['remaining'], 0, ',', ' ') }}</dd></div></dl></section>
+<section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-900"><h2 class="text-lg font-semibold">Dossiers</h2><dl class="mt-4 grid gap-3 sm:grid-cols-2"><div><dt class="text-sm text-gray-500">En attente</dt><dd class="text-xl font-semibold">{{ number_format($data['summary']['pending'], 0, ',', ' ') }}</dd></div><div><dt class="text-sm text-gray-500">Validés</dt><dd class="text-xl font-semibold">{{ number_format($data['summary']['validated'], 0, ',', ' ') }}</dd></div><div><dt class="text-sm text-gray-500">Rejetés</dt><dd class="text-xl font-semibold">{{ number_format($data['summary']['rejected'], 0, ',', ' ') }}</dd></div><div><dt class="text-sm text-gray-500">Taux de traitement</dt><dd class="text-xl font-semibold">{{ $data['summary']['treatment_rate'] }} %</dd></div></dl></section>
+</div>
+<div class="mt-6 grid gap-6 xl:grid-cols-3">
+@foreach ([['Programmes', $data['programs']], ['Universités', $data['universities']], ['Régions', $data['regions']]] as [$title, $rows])<section class="overflow-x-auto rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-900"><h2 class="mb-4 text-lg font-semibold">{{ $title }}</h2><table class="w-full text-left text-sm"><thead><tr><th class="py-2">Libellé</th><th class="py-2">Dossiers</th><th class="py-2">Validés</th><th class="py-2">Rejetés</th></tr></thead><tbody>@forelse($rows as $row)<tr class="border-t border-gray-100 dark:border-white/10"><td class="py-2">{{ $row['label'] ?? $row['region'] }}</td><td class="py-2">{{ $row['applications'] ?? 0 }}</td><td class="py-2">{{ $row['validated'] ?? 0 }}</td><td class="py-2">{{ $row['rejected'] ?? 0 }}</td></tr>@empty<tr><td class="py-2" colspan="4">Aucune donnée.</td></tr>@endforelse</tbody></table></section>@endforeach
+</div>
+</x-filament-panels::page>

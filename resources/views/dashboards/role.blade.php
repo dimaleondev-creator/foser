@@ -9,7 +9,7 @@
 <body class="student-body">
     <header class="student-header">
         <div class="shell nav-wrap">
-            <a class="brand" href="{{ url('/') }}"><span class="brand-mark">F</span><span><strong>FOSER</strong><small>Espace institutionnel</small></span></a>
+            <a class="brand" href="{{ url('/') }}"><x-site-logo-mark /><span><strong>FOSER</strong><small>Espace institutionnel</small></span></a>
             <form method="POST" action="{{ route('auth.logout') }}">@csrf<button class="button button-dark" type="submit">Déconnexion</button></form>
         </div>
     </header>

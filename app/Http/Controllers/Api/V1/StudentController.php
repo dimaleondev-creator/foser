@@ -4,36 +4,65 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\User;
 use App\Http\Resources\StudentResource;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class StudentController extends ApiController
 {
     protected string $model = User::class;
     protected string $resource = StudentResource::class;
-    protected array $searchable = ['name', 'email'];
+    protected array $searchable = [];
     protected array $filterable = ['status'];
     protected array $sortable = ['name', 'created_at', 'updated_at'];
 
-    public function index(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    protected function scopeQuery(Builder $query, Request $request): void
     {
-        $request->merge(['account_type' => 'etudiant']);
-        $this->filterable = ['account_type', 'status'];
-        if ($request->filled('inee')) {
-            $request->merge(['inee' => (string) $request->input('inee')]);
-        }
-        $query = User::query()->where('account_type', 'etudiant')->leftJoin('student_profiles', 'student_profiles.user_id', '=', 'users.id')->select('users.*')->when($request->input('inee'), fn ($builder, string $inee) => $builder->where('student_profiles.inee', $inee));
-        if ($request->filled('search')) {
-            $term = (string) $request->input('search');
-            $query->where(fn ($builder) => $builder->where('users.name', 'like', "%{$term}%")->orWhere('users.email', 'like', "%{$term}%")->orWhere('student_profiles.inee', 'like', "%{$term}%"));
-        }
-        $paginator = $query->paginate((int) $request->input('per_page', 20))->withQueryString();
+        $query->where('users.account_type', 'etudiant');
+        $user = $request->user();
 
-        return response()->json(['data' => StudentResource::collection($paginator->items()), 'meta' => ['current_page' => $paginator->currentPage(), 'last_page' => $paginator->lastPage(), 'total' => $paginator->total()]]);
+        if ($this->isInstitutionalStaff($user)) {
+            return;
+        }
+
+        if ($user->hasRole('universite')) {
+            $query->whereIn('users.id', function ($profileQuery) use ($user): void {
+                $profileQuery->select('user_id')
+                    ->from('student_profiles')
+                    ->whereIn('university_id', $this->universityIdsFor($user));
+            });
+            return;
+        }
+
+        if ($user->can('users.view')) {
+            return;
+        }
+
+        abort_unless($user->hasAnyRole(['etudiant']), 403);
+        $query->where('users.id', $user->id);
     }
 
-    public function show(string $id): \Illuminate\Http\JsonResponse
+    protected function applyQuery(Builder $query, array $filters): void
     {
-        $student = User::where('account_type', 'etudiant')->findOrFail($id);
-        return response()->json(['data' => new StudentResource($student)]);
+        if (! empty($filters['search'])) {
+            $term = '%'.$filters['search'].'%';
+            $query->where(function (Builder $searchQuery) use ($term): void {
+                $searchQuery->where('users.name', 'like', $term)
+                    ->orWhere('users.email', 'like', $term)
+                    ->orWhereExists(function ($profileQuery) use ($term): void {
+                        $profileQuery->selectRaw('1')
+                            ->from('student_profiles')
+                            ->whereColumn('student_profiles.user_id', 'users.id')
+                            ->where('student_profiles.inee', 'like', $term);
+                    });
+            });
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('users.status', $filters['status']);
+        }
+
+        $sort = in_array($filters['sort'] ?? '', $this->sortable, true) ? $filters['sort'] : 'created_at';
+        $query->orderBy('users.'.$sort, $filters['direction'] ?? 'desc');
     }
 }

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 abstract class ApiController
 {
@@ -26,6 +28,7 @@ abstract class ApiController
         ] + collect($this->filterable)->mapWithKeys(fn (string $field) => [$field => ['nullable', 'string', 'max:100']])->all());
 
         $query = ($this->model)::query();
+        $this->scopeQuery($query, $request);
         $this->applyQuery($query, $validated);
         $paginator = $query->paginate((int) ($validated['per_page'] ?? 20))->withQueryString();
 
@@ -35,10 +38,35 @@ abstract class ApiController
         ]]);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $model = ($this->model)::query()->findOrFail($id);
+        $query = ($this->model)::query();
+        $this->scopeQuery($query, $request);
+        $model = $query->findOrFail($id);
         return response()->json(['data' => new $this->resource($model)]);
+    }
+
+    protected function scopeQuery(Builder $query, Request $request): void
+    {
+    }
+
+    protected function isInstitutionalStaff(User $user): bool
+    {
+        return $user->hasAnyRole([
+            'super_admin', 'admin', 'directeur_general', 'gestionnaire',
+            'agent_dossier', 'agent_finance', 'agent_recherche',
+        ]);
+    }
+
+    protected function universityIdsFor(User $user): \Illuminate\Database\Query\Builder
+    {
+        $query = DB::table('university_users')->select('university_id')->where('user_id', $user->id);
+
+        if (filled($user->university_id)) {
+            $query->orWhere('university_id', $user->university_id);
+        }
+
+        return $query;
     }
 
     protected function applyQuery(Builder $query, array $filters): void

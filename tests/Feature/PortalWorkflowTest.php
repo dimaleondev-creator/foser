@@ -24,12 +24,13 @@ class PortalWorkflowTest extends TestCase
 
     public function test_student_can_register_and_logout(): void
     {
+        $this->post(route('ine.verify'), ['last_name' => 'Test', 'first_name' => 'Awa', 'inee' => 'ETU-TEST-001'])->assertRedirect();
         $response = $this->post('/student/register', [
-            'name' => 'Awa Test', 'email' => 'awa@example.test', 'phone' => '07000000', 'inee' => 'ETU-TEST-001',
+            'name' => 'Awa Test', 'email' => 'awa@example.test', 'phone' => '07000000', 'terms' => '1',
             'password' => 'password123', 'password_confirmation' => 'password123',
         ]);
 
-        $response->assertRedirect('/student');
+        $response->assertRedirect(route('ine.declare'));
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', ['email' => 'awa@example.test']);
         $this->assertDatabaseHas('student_profiles', ['inee' => DB::table('student_profiles')->value('inee')]);
@@ -61,6 +62,26 @@ class PortalWorkflowTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'application.status_changed', 'auditable_id' => $applicationId]);
     }
 
+    public function test_student_without_a_usable_inee_cannot_create_a_draft(): void
+    {
+        $programId = (string) Str::uuid();
+        $callId = (string) Str::uuid();
+        DB::table('programs')->insert(['id' => $programId, 'name' => 'Programme INEE', 'code' => 'INEE-'.Str::random(5), 'type' => 'education', 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('calls')->insert(['id' => $callId, 'program_id' => $programId, 'title' => 'Appel INEE', 'reference' => 'INEE-'.Str::random(5), 'opens_at' => today()->subDay(), 'closes_at' => today()->addDay(), 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        $student = User::factory()->create(['account_type' => 'etudiant']);
+        $student->assignRole('etudiant');
+        DB::table('student_profiles')->insert(['id' => (string) Str::uuid(), 'user_id' => $student->id, 'inee' => null, 'created_at' => now(), 'updated_at' => now()]);
+
+        try {
+            app(StudentApplicationWorkflow::class)->createDraft($student, $callId);
+            $this->fail('A student without an INEE must not create an application.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('inee', $exception->errors());
+        }
+
+        $this->assertDatabaseCount('applications', 0);
+    }
+
     public function test_operator_can_check_completeness_and_student_cannot_edit_submitted_dossier(): void
     {
         $programId = (string) Str::uuid();
@@ -83,6 +104,82 @@ class PortalWorkflowTest extends TestCase
         $operator->assignRole('agent_dossier');
         $this->assertSame('agent_dossier', $operator->account_type);
         $this->assertDatabaseHas('application_status_histories', ['application_id' => $application->id, 'to_status' => 'recevable']);
+    }
+
+    public function test_rejected_required_document_does_not_count_toward_completeness(): void
+    {
+        $programId = (string) Str::uuid();
+        $callId = (string) Str::uuid();
+        DB::table('programs')->insert(['id' => $programId, 'name' => 'Programme pièces', 'code' => 'DOC-'.Str::random(5), 'type' => 'education', 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('calls')->insert(['id' => $callId, 'program_id' => $programId, 'title' => 'Appel pièces', 'reference' => 'DOC-'.Str::random(5), 'opens_at' => today()->subDay(), 'closes_at' => today()->addDay(), 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        $student = User::factory()->create(['account_type' => 'etudiant']);
+        $student->assignRole('etudiant');
+        DB::table('student_profiles')->insert(['id' => (string) Str::uuid(), 'user_id' => $student->id, 'inee' => 'DOC-'.Str::random(8), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('required_documents')->insert(['id' => (string) Str::uuid(), 'program_id' => $programId, 'document_type' => 'identite', 'label' => 'Pièce d’identité', 'is_required' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $application = app(StudentApplicationWorkflow::class)->createDraft($student, $callId);
+        DB::table('applications')->where('id', $application->id)->update([
+            'project_title' => 'Projet complet', 'summary' => 'Résumé', 'description' => 'Description', 'domain' => 'Domaine',
+            'objectives' => 'Objectifs', 'methodology' => 'Méthode', 'calendar' => 'Calendrier', 'budget' => 1000,
+        ]);
+        $document = Document::create(['uploaded_by' => $student->id, 'title' => 'Pièce rejetée', 'document_type' => 'identite', 'disk' => 'local', 'path' => 'student-documents/rejected.pdf', 'mime_type' => 'application/pdf', 'size' => 10, 'visibility' => 'private']);
+        DB::table('application_documents')->insert(['id' => (string) Str::uuid(), 'application_id' => $application->id, 'document_id' => $document->id, 'status' => 'rejected', 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        app(StudentApplicationWorkflow::class)->transition($student, $application->id, StudentApplicationStatus::SOUMIS);
+    }
+
+    public function test_student_can_resubmit_a_completed_complement_request(): void
+    {
+        $programId = (string) Str::uuid();
+        $callId = (string) Str::uuid();
+        DB::table('programs')->insert(['id' => $programId, 'name' => 'Programme complément', 'code' => 'COMP-'.Str::random(5), 'type' => 'education', 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('calls')->insert(['id' => $callId, 'program_id' => $programId, 'title' => 'Appel complément', 'reference' => 'COMP-'.Str::random(5), 'opens_at' => today()->subDay(), 'closes_at' => today()->addDay(), 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        $student = User::factory()->create(['account_type' => 'etudiant']);
+        $student->assignRole('etudiant');
+        DB::table('student_profiles')->insert(['id' => (string) Str::uuid(), 'user_id' => $student->id, 'inee' => 'COMP-'.Str::random(8), 'created_at' => now(), 'updated_at' => now()]);
+        $application = app(StudentApplicationWorkflow::class)->createDraft($student, $callId);
+        DB::table('applications')->where('id', $application->id)->update([
+            'status' => 'complement', 'project_title' => 'Projet complété', 'summary' => 'Résumé', 'description' => 'Description',
+            'domain' => 'Domaine', 'objectives' => 'Objectifs', 'methodology' => 'Méthode', 'calendar' => 'Calendrier', 'budget' => 1000,
+        ]);
+
+        app(StudentApplicationWorkflow::class)->transition($student, $application->id, StudentApplicationStatus::SOUMIS);
+
+        $this->assertDatabaseHas('applications', ['id' => $application->id, 'status' => 'recevable']);
+    }
+
+    public function test_call_capacity_is_enforced_when_students_submit_their_drafts(): void
+    {
+        $programId = (string) Str::uuid();
+        $callId = (string) Str::uuid();
+        DB::table('programs')->insert(['id' => $programId, 'name' => 'Programme capacité', 'code' => 'CAP-'.Str::random(5), 'type' => 'education', 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('calls')->insert(['id' => $callId, 'program_id' => $programId, 'title' => 'Appel capacité', 'reference' => 'CAP-'.Str::random(5), 'opens_at' => today()->subDay(), 'closes_at' => today(), 'places' => 1, 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
+        $workflow = app(StudentApplicationWorkflow::class);
+        $applications = [];
+
+        foreach (range(1, 2) as $index) {
+            $student = User::factory()->create(['account_type' => 'etudiant']);
+            $student->assignRole('etudiant');
+            DB::table('student_profiles')->insert(['id' => (string) Str::uuid(), 'user_id' => $student->id, 'inee' => 'CAP'.$index.'-'.Str::random(6), 'created_at' => now(), 'updated_at' => now()]);
+            $application = $workflow->createDraft($student, $callId);
+            $workflow->updateDraft($student, $application->id, [
+                'project_title' => 'Projet '.$index, 'summary' => 'Résumé', 'description' => 'Description', 'domain' => 'Domaine',
+                'objectives' => 'Objectifs', 'methodology' => 'Méthode', 'calendar' => 'Calendrier', 'budget' => 1000,
+            ]);
+            $applications[] = [$student, $application];
+        }
+
+        $workflow->transition($applications[0][0], $applications[0][1]->id, StudentApplicationStatus::SOUMIS);
+
+        try {
+            $workflow->transition($applications[1][0], $applications[1][1]->id, StudentApplicationStatus::SOUMIS);
+            $this->fail('The call capacity must prevent a second submission.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('places', $exception->errors());
+        }
+
+        $this->assertDatabaseHas('applications', ['id' => $applications[0][1]->id, 'status' => 'recevable']);
+        $this->assertDatabaseHas('applications', ['id' => $applications[1][1]->id, 'status' => 'brouillon']);
     }
 
     public function test_student_can_only_see_own_application_timeline(): void

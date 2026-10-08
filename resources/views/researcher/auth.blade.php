@@ -9,7 +9,7 @@
 <body>
     <main class="auth-shell">
         <a class="brand" href="{{ route('home') }}">
-            <span class="brand-mark">F</span>
+            <x-site-logo-mark />
             <span>
                 <strong>FOSER</strong>
                 <small>Espace chercheur</small>
@@ -33,24 +33,6 @@
                     <label>Domaine de recherche<input name="research_domain" value="{{ old('research_domain') }}" required></label>
                     <label>Spécialité<input name="speciality" value="{{ old('speciality') }}" required></label>
                     <label>Grade académique<input name="academic_rank" value="{{ old('academic_rank') }}"></label>
-                    <label>
-                        Institution
-                        <select name="university_id">
-                            <option value="">Sélectionner</option>
-                            @foreach($universities as $university)
-                                <option value="{{ $university->id }}">{{ $university->name }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    <label>
-                        Laboratoire
-                        <select name="laboratory_id">
-                            <option value="">Sélectionner</option>
-                            @foreach($laboratories as $laboratory)
-                                <option value="{{ $laboratory->id }}">{{ $laboratory->name }}</option>
-                            @endforeach
-                        </select>
-                    </label>
                     <label>Fonction<input name="position" value="{{ old('position') }}"></label>
                     <label>ORCID<input name="orcid" value="{{ old('orcid') }}"></label>
                     <label>Années d'expérience<input type="number" name="years_experience" min="0" max="80" value="{{ old('years_experience') }}"></label>

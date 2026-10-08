@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Document;
 use App\Models\Download;
+use App\Services\DocumentAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
@@ -11,9 +12,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentDownloadController
 {
-    public function __invoke(Request $request, Document $document): StreamedResponse
+    public function __invoke(Request $request, Document $document, DocumentAccessService $access): StreamedResponse
     {
-        abort_unless($document->status === 'published', 404);
+        $document = $access->scope(Document::query(), $request->user())->whereKey($document->getKey())->firstOrFail();
         /** @var FilesystemAdapter $disk */
         $disk = Storage::disk($document->disk);
         abort_unless($disk->exists($document->path), 404);
@@ -25,6 +26,8 @@ class DocumentDownloadController
         ]);
 
         $extension = pathinfo($document->path, PATHINFO_EXTENSION) ?: 'pdf';
-        return $disk->download($document->path, basename($document->title) . '.' . $extension);
+        $filename = \Illuminate\Support\Str::slug(pathinfo($document->title, PATHINFO_FILENAME)).'.'.$extension;
+
+        return $disk->download($document->path, $filename, ['X-Content-Type-Options' => 'nosniff']);
     }
 }

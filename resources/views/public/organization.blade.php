@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="topline"><div class="shell top-inner"><span>RÉPUBLIQUE DU BURKINA FASO</span><a href="{{ url('/contact') }}">Nous contacter</a></div></div>
-    <header class="site-header"><div class="shell nav-wrap"><a class="brand" href="{{ url('/') }}"><span class="brand-mark">F</span><span><strong>FOSER</strong><small>Fonds de Soutien à l'Éducation<br>et à la Recherche</small></span></a><nav class="main-nav"><a href="{{ url('/') }}">Accueil</a><a href="{{ url('/about') }}">Le FOSER</a><a href="{{ url('/programs') }}">Nos programmes</a><a href="{{ url('/calls') }}">Appels à candidatures</a><a class="active" href="{{ route('organization') }}">Organisation</a></nav><a class="button button-dark" href="{{ route('student.login') }}">Espace étudiant <span>↗</span></a></div></header>
+    <header class="site-header"><div class="shell nav-wrap"><a class="brand" href="{{ url('/') }}"><x-site-logo-mark /><span><strong>FOSER</strong><small>Fonds de Soutien à l'Éducation<br>et à la Recherche</small></span></a><nav class="main-nav"><a href="{{ url('/') }}">Accueil</a><a href="{{ url('/about') }}">Le FOSER</a><a href="{{ url('/programs') }}">Nos programmes</a><a href="{{ url('/calls') }}">Appels à candidatures</a><a class="active" href="{{ route('organization') }}">Organisation</a></nav><a class="button button-dark" href="{{ route('student.login') }}">Espace étudiant <span>↗</span></a></div></header>
     <main class="organization-page">
         <header class="page-hero"><div class="shell"><p class="section-kicker">FOSER</p><h1>{{ app()->getLocale() === 'en' ? 'Our organization' : 'Notre organisation' }}</h1></div></header>
         <section class="organization-shell shell" data-organization-tree>
@@ -21,6 +21,6 @@
             @endforelse
         </section>
     </main>
-    <footer class="footer"><div class="shell footer-main"><div class="footer-brand"><a class="brand brand-light" href="{{ url('/') }}"><span class="brand-mark">F</span><span><strong>FOSER</strong><small>Fonds de Soutien à l'Éducation<br>et à la Recherche</small></span></a><p>Construire les capacités.<br>Faire grandir les possibles.</p></div></div></footer>
+    <footer class="footer"><x-site-partners-footer /><div class="shell footer-main"><div class="footer-brand"><a class="brand brand-light" href="{{ url('/') }}"><x-site-logo-mark /><span><strong>FOSER</strong><small>Fonds de Soutien à l'Éducation<br>et à la Recherche</small></span></a><p>Construire les capacités.<br>Faire grandir les possibles.</p></div></div></footer>
 </body>
 </html>

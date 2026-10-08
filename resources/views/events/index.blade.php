@@ -2,7 +2,7 @@
 <html lang="fr">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agenda | FOSER</title>@vite(['resources/css/app.css','resources/js/app.js'])</head>
 <body>
-<header class="site-header"><div class="shell nav-wrap"><a class="brand" href="{{ route('home') }}"><span class="brand-mark">F</span><span><strong>FOSER</strong><small>Agenda institutionnel</small></span></a><a class="text-link" href="{{ route('home') }}">Accueil</a></div></header>
+<header class="site-header"><div class="shell nav-wrap"><a class="brand" href="{{ route('home') }}"><x-site-logo-mark /><span><strong>FOSER</strong><small>Agenda institutionnel</small></span></a><a class="text-link" href="{{ route('home') }}">Accueil</a></div></header>
 <main class="shell section-pad">
     <div class="section-kicker"><span>AGENDA</span><span>Rendez-vous du FOSER</span></div>
     <h1>Les événements à venir</h1>

@@ -12,10 +12,13 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use UnitEnum;
 
 class CmsContentResource extends Resource
@@ -31,8 +34,10 @@ class CmsContentResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            TextInput::make('content_key')->label('Clé de contenu')->required()->maxLength(100),
-            Select::make('locale')->label('Langue')->options(['fr' => 'Français', 'en' => 'Anglais'])->default('fr')->required(),
+            TextInput::make('content_key')->label('Clé de contenu')->required()->maxLength(100)->rules(fn (Get $get, ?CmsContent $record): array => [
+                Rule::unique('cms_contents', 'content_key')->where(fn ($query) => $query->where('locale', $get('locale')))->ignore($record?->getKey()),
+            ]),
+            Select::make('locale')->label('Langue')->options(['fr' => 'Français', 'en' => 'Anglais'])->default('fr')->required()->live(),
             TextInput::make('title')->label('Titre')->maxLength(255),
             Textarea::make('summary')->label('Résumé')->columnSpanFull(),
             Textarea::make('body')->label('Contenu')->rows(12)->columnSpanFull(),
@@ -48,8 +53,12 @@ class CmsContentResource extends Resource
             TextColumn::make('locale')->label('Langue')->badge(),
             TextColumn::make('title')->label('Titre')->searchable(),
             TextColumn::make('status')->label('Statut')->badge(),
+            TextColumn::make('published_at')->label('Publication')->dateTime('d/m/Y H:i')->sortable(),
             TextColumn::make('author.name')->label('Auteur'),
             TextColumn::make('updated_at')->label('Modifié le')->dateTime()->sortable(),
+        ])->filters([
+            SelectFilter::make('status')->options(['draft' => 'Brouillon', 'published' => 'Publié', 'archived' => 'Archivé']),
+            SelectFilter::make('locale')->label('Langue')->options(['fr' => 'Français', 'en' => 'Anglais']),
         ])->recordActions([
             EditAction::make()->visible(fn () => Gate::allows('content.update')),
             DeleteAction::make()->visible(fn () => Gate::allows('content.delete')),

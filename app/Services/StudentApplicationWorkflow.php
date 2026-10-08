@@ -19,7 +19,7 @@ class StudentApplicationWorkflow
         'verification' => ['recevable', 'incomplet', 'complement', 'evaluation', 'rejete'],
         'recevable' => ['evaluation'],
         'incomplet' => ['complement'],
-        'complement' => ['brouillon'],
+        'complement' => ['brouillon', 'soumis'],
         'evaluation' => ['valide', 'rejete'],
         'valide' => ['decision', 'approuve', 'rejete'],
         'decision' => ['approuve', 'rejete'],
@@ -38,6 +38,9 @@ class StudentApplicationWorkflow
 
         if (! $profile) {
             throw ValidationException::withMessages(['profile' => 'Complétez votre profil étudiant avant de créer un dossier.']);
+        }
+        if (blank($profile->inee) || in_array($profile->ine_status ?? 'pending', ['rejected', 'suspended'], true)) {
+            throw ValidationException::withMessages(['inee' => 'Un INEE déclaré et non suspendu est obligatoire pour créer un dossier.']);
         }
 
         $call = $this->openCall($callId);
@@ -110,30 +113,33 @@ class StudentApplicationWorkflow
         }
 
         if ($next === StudentApplicationStatus::SOUMIS) {
-            $completeness = app(ApplicationCompletenessService::class)->check($applicationId);
-            if (! $completeness['is_complete']) {
-                throw ValidationException::withMessages([
-                    'application' => 'Le dossier est incomplet.',
-                    'missing_fields' => implode(', ', $completeness['missing_fields']),
-                    'missing_documents' => implode(', ', $completeness['missing_documents']),
-                ]);
-            }
+            DB::transaction(function () use ($application, $student, $applicationId, $next): void {
+                app(CallCapacityService::class)->lockAndAssertAvailable($application->call_id, $applicationId);
+                $completeness = app(ApplicationCompletenessService::class)->check($applicationId);
+                if (! $completeness['is_complete']) {
+                    throw ValidationException::withMessages([
+                        'application' => 'Le dossier est incomplet.',
+                        'missing_fields' => implode(', ', $completeness['missing_fields']),
+                        'missing_documents' => implode(', ', $completeness['missing_documents']),
+                    ]);
+                }
+
+                $this->applyTransition($application, $student, $next);
+                $submitted = (object) [...(array) $application, 'status' => StudentApplicationStatus::SOUMIS->value];
+                $this->applyTransition($submitted, $student, StudentApplicationStatus::VERIFICATION);
+                $missing = $this->missingDocuments($application->id, $application->program_id);
+                $this->applyTransition(
+                    (object) [...(array) $application, 'status' => StudentApplicationStatus::VERIFICATION->value],
+                    $student,
+                    $missing ? StudentApplicationStatus::INCOMPLET : StudentApplicationStatus::RECEVABLE,
+                    $missing ? implode(', ', $missing) : null,
+                );
+            });
+
+            return;
         }
 
         $this->applyTransition($application, $student, $next);
-
-        if ($next === StudentApplicationStatus::SOUMIS) {
-            $submitted = (object) [...(array) $application, 'status' => StudentApplicationStatus::SOUMIS->value];
-            $this->applyTransition($submitted, $student, StudentApplicationStatus::VERIFICATION);
-            $missing = $this->missingDocuments($application->id, $application->program_id);
-            $this->applyTransition(
-                (object) [...(array) $application, 'status' => StudentApplicationStatus::VERIFICATION->value],
-                $student,
-                $missing ? StudentApplicationStatus::INCOMPLET : StudentApplicationStatus::RECEVABLE,
-                $missing ? implode(', ', $missing) : null,
-            );
-        }
-
     }
 
     public function checkCompleteness(User $operator, string $applicationId): StudentApplicationStatus
@@ -159,7 +165,11 @@ class StudentApplicationWorkflow
     public function missingDocuments(string $applicationId, string $programId): array
     {
         $required = DB::table('required_documents')->where('program_id', $programId)->where('is_required', true)->pluck('document_type');
-        $provided = DB::table('application_documents')->join('documents', 'documents.id', '=', 'application_documents.document_id')->where('application_id', $applicationId)->pluck('documents.document_type');
+        $provided = DB::table('application_documents')
+            ->join('documents', 'documents.id', '=', 'application_documents.document_id')
+            ->where('application_id', $applicationId)
+            ->where('application_documents.status', '!=', 'rejected')
+            ->pluck('documents.document_type');
         return $required->diff($provided)->values()->all();
     }
 

@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ResearcherRegistrationTest extends TestCase
@@ -40,6 +41,35 @@ class ResearcherRegistrationTest extends TestCase
         $this->actingAs($researcher)->get(route('researcher.dashboard'))->assertRedirect(route('researcher.pending'));
     }
 
+    public function test_researcher_registration_cannot_assign_its_own_university_or_laboratory(): void
+    {
+        $universityId = (string) Str::uuid();
+        DB::table('universities')->insert(['id' => $universityId, 'name' => 'Université revendiquée', 'code' => 'CLAIM-'.Str::random(5), 'country' => 'Burkina Faso', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
+        $laboratoryId = (string) Str::uuid();
+        DB::table('laboratories')->insert(['id' => $laboratoryId, 'university_id' => $universityId, 'name' => 'Laboratoire revendiqué', 'code' => 'LAB-CLAIM-'.Str::random(5), 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->post('/researcher/register', [...$this->registrationPayload(), 'university_id' => $universityId, 'laboratory_id' => $laboratoryId])
+            ->assertSessionHasErrors(['university_id', 'laboratory_id']);
+
+        $this->assertDatabaseMissing('users', ['email' => 'researcher@example.test']);
+    }
+
+    public function test_researcher_registration_uses_legacy_role_when_researcher_role_is_missing(): void
+    {
+        Mail::fake();
+        Role::query()->where('name', 'researcher')->where('guard_name', 'web')->delete();
+
+        $response = $this->post('/researcher/register', $this->registrationPayload());
+        $researcher = User::where('email', 'researcher@example.test')->firstOrFail();
+
+        $response->assertRedirect(route('researcher.pending', [
+            'reference' => DB::table('researcher_profiles')->where('user_id', $researcher->id)->value('registration_reference'),
+        ]));
+        $this->assertTrue($researcher->hasRole('chercheur'));
+        $this->assertTrue($researcher->can('research.view'));
+        $this->assertDatabaseHas('researcher_profiles', ['user_id' => $researcher->id, 'status' => 'pending']);
+    }
+
     public function test_admin_can_approve_and_approved_researcher_can_login(): void
     {
         Mail::fake();
@@ -55,6 +85,17 @@ class ResearcherRegistrationTest extends TestCase
         Mail::assertSent(ResearcherAccountApprovedMail::class);
         $this->post('/logout');
         $this->post('/researcher/login', ['email' => 'researcher@example.test', 'password' => 'password123'])->assertRedirect(route('researcher.dashboard'));
+    }
+
+    public function test_researcher_cannot_approve_their_own_account_or_another_researcher(): void
+    {
+        $this->post('/researcher/register', $this->registrationPayload());
+        $researcher = User::where('email', 'researcher@example.test')->firstOrFail();
+        $profileId = DB::table('researcher_profiles')->where('user_id', $researcher->id)->value('id');
+
+        $this->actingAs($researcher)->post(route('admin.researchers.approve', $profileId))->assertForbidden();
+        $this->assertDatabaseHas('researcher_profiles', ['id' => $profileId, 'status' => 'pending']);
+        $this->assertDatabaseHas('users', ['id' => $researcher->id, 'status' => 'pending']);
     }
 
     public function test_rejected_and_suspended_researchers_are_blocked(): void
@@ -76,7 +117,7 @@ class ResearcherRegistrationTest extends TestCase
         $this->post('/researcher/login', ['email' => $researcher->email, 'password' => 'password123'])->assertRedirect(route('researcher.suspended'));
     }
 
-    public function test_researcher_cannot_submit_an_incomplete_project(): void
+    public function test_researcher_can_complete_a_draft_after_submission_validation_errors(): void
     {
         $researcher = User::factory()->create(['account_type' => 'researcher', 'status' => 'active']);
         $researcher->assignRole('researcher');
@@ -85,9 +126,19 @@ class ResearcherRegistrationTest extends TestCase
             ->assertRedirect();
         $projectId = DB::table('research_projects')->where('principal_researcher_id', $researcher->id)->value('id');
 
-        $this->actingAs($researcher)->post(route('researcher.projects.submit', $projectId))
-            ->assertStatus(422);
+        $this->actingAs($researcher)->from(route('researcher.projects.show', $projectId))->post(route('researcher.projects.submit', $projectId))
+            ->assertRedirect(route('researcher.projects.show', $projectId))
+            ->assertSessionHasErrors(['abstract', 'domain', 'budget']);
         $this->assertDatabaseHas('research_projects', ['id' => $projectId, 'status' => 'draft']);
+        $this->get(route('researcher.projects.show', $projectId))
+            ->assertOk()->assertSee('Compléter ou modifier le projet')->assertSee('name="domain"', false);
+
+        $this->put(route('researcher.projects.update', $projectId), [
+            'title' => 'Projet complet', 'abstract' => 'Résumé scientifique complet.', 'domain' => 'Agronomie',
+            'budget' => 250000, 'currency' => 'FCFA',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post(route('researcher.projects.submit', $projectId))->assertRedirect();
+        $this->assertDatabaseHas('research_projects', ['id' => $projectId, 'status' => 'submitted', 'domain' => 'Agronomie', 'budget' => 250000]);
     }
 
     public function test_researcher_can_only_add_active_researchers_to_a_project(): void

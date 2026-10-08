@@ -1,0 +1,7 @@
+# Centre documentaire FOSER
+
+Les documents officiels sont stockés sur le disque `local` (stockage non servi par le lien public `/storage`). Toute pièce privée enregistrée par erreur sur le disque `public` est déplacée vers `local` avant la sauvegarde du modèle et sa copie publique est supprimée. Les documents visibles publiquement restent servis par les routes contrôlées du portail, après vérification de leur statut, visibilité et date de publication.
+
+Le catalogue public et l’API s’appuient sur le contrat `App\Contracts\SearchService` pour rechercher titre, description, mots-clés, auteur et référence; le nom de catégorie est ajouté comme critère relationnel. `PostgresSearchService` fournit le comportement SQL actuel. Un adaptateur Elasticsearch pourra implémenter ce contrat plus tard, sans changer les contrôleurs ni ajouter de RAG.
+
+Les catégories institutionnelles sont maintenues par `DocumentCategoriesSeeder`. Les mots-clés sont stockés en texte séparé par des virgules et recherchés avec les autres métadonnées. L’upload Filament utilise le disque privé, avec versions historisées par `DocumentObserver`; la publication et le changement de visibilité nécessitent `documents.validate`.

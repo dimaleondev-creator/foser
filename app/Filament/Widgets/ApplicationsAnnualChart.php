@@ -16,5 +16,5 @@ class ApplicationsAnnualChart extends ChartWidget
         $rows = app(DashboardStatisticsService::class)->charts($this->filters(), 100)['annual'];
         return ['labels' => array_column($rows, 'label'), 'datasets' => [['label' => 'Dossiers déposés', 'data' => array_column($rows, 'total')]]];
     }
-    private function filters(): array { return request()->only(['year', 'region', 'university_id', 'program_id', 'sex', 'status']); }
+    private function filters(): array { return request()->only(['year', 'from', 'to', 'region', 'university_id', 'program_id', 'sex', 'status']); }
 }

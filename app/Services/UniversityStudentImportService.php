@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use OpenSpout\Reader\XLSX\Reader;
+use OpenSpout\Reader\CSV\Reader as CsvReader;
 
 class UniversityStudentImportService
 {
@@ -69,12 +70,18 @@ class UniversityStudentImportService
             $report['lines'][] = ['line' => $line, 'status' => 'imported', 'message' => 'Étudiant importé.'];
         }
 
+        $importId = (string) Str::uuid();
         DB::table('university_imports')->insert([
-            'id' => (string) Str::uuid(), 'university_id' => $universityId, 'imported_by' => $importedBy,
+            'id' => $importId, 'university_id' => $universityId, 'imported_by' => $importedBy,
             'filename' => $file->getClientOriginalName(), 'status' => 'completed',
             'imported_count' => $report['imported'], 'updated_count' => $report['updated'],
             'rejected_count' => $report['rejected'], 'error_count' => $report['errors'],
             'report' => json_encode($report), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        app(AuditLogger::class)->record('university.students.imported', 'university_imports', $importId, [], [
+            'university_id' => $universityId, 'performed_by' => $importedBy,
+            'imported' => $report['imported'], 'updated' => $report['updated'],
+            'rejected' => $report['rejected'], 'errors' => $report['errors'],
         ]);
 
         return $report;
@@ -82,12 +89,12 @@ class UniversityStudentImportService
 
     public function preview(UploadedFile $file): array
     {
-        return array_slice($this->readRows($file), 1, 10, true);
+        return array_slice($this->readRows($file), 0, 10, true);
     }
 
     private function readRows(UploadedFile $file): array
     {
-        $reader = new Reader();
+        $reader = in_array(strtolower($file->getClientOriginalExtension()), ['csv', 'txt'], true) ? new CsvReader() : new Reader();
         $reader->open($file->getRealPath());
         $rows = [];
         $headers = [];

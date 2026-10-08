@@ -5,6 +5,10 @@ namespace App\Filament\Resources\Calls;
 use App\Filament\Resources\Calls\Pages\ManageCalls;
 use App\Models\Call;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -48,7 +52,7 @@ class CallResource extends Resource
                 TextInput::make('amount')->numeric()->minValue(0),
                 TextInput::make('available_budget')->label('Budget disponible')->numeric()->minValue(0),
                 TextInput::make('maximum_project_amount')->label('Montant maximal par projet')->numeric()->minValue(0),
-                TextInput::make('currency')->default('GNF')->length(3),
+                TextInput::make('currency')->default('FCFA')->length(4),
                 DatePicker::make('published_at')->label('Date de publication'),
                 DatePicker::make('opens_at')->required(),
                 DatePicker::make('closes_at')->required()->after('opens_at'),
@@ -70,6 +74,35 @@ class CallResource extends Resource
             TextColumn::make('opens_at')->date(),
             TextColumn::make('closes_at')->date(),
             TextColumn::make('places'),
+        ])->recordActions([
+            ViewAction::make()->label('Détails')->visible(fn (): bool => Gate::allows('calls.view')),
+            EditAction::make()->label('Modifier')->visible(fn (): bool => Gate::allows('calls.update')),
+            Action::make('publish')->label('Publier')->icon('heroicon-o-megaphone')->color('success')
+                ->visible(fn (Call $record): bool => Gate::allows('calls.publish') && in_array($record->status, ['draft', 'scheduled'], true))
+                ->requiresConfirmation()
+                ->action(fn (Call $record) => $record->forceFill(['status' => 'published', 'published_at' => now()])->save()),
+            Action::make('close')->label('Clôturer')->icon('heroicon-o-lock-closed')
+                ->visible(fn (Call $record): bool => Gate::allows('calls.close') && $record->status === 'published')
+                ->requiresConfirmation()
+                ->action(fn (Call $record) => $record->update(['status' => 'closed'])),
+            Action::make('archive')->label('Archiver')->icon('heroicon-o-archive-box')
+                ->visible(fn (Call $record): bool => Gate::allows('calls.update') && in_array($record->status, ['closed', 'suspended'], true))
+                ->requiresConfirmation()
+                ->action(fn (Call $record) => $record->update(['status' => 'archived'])),
+            Action::make('duplicate')->label('Dupliquer')->icon('heroicon-o-document-duplicate')
+                ->visible(fn (): bool => Gate::allows('calls.create'))
+                ->requiresConfirmation()
+                ->action(function (Call $record): void {
+                    $copy = $record->replicate();
+                    $copy->forceFill([
+                        'title' => $record->title.' (copie)',
+                        'reference' => substr($record->reference, 0, 75).'-COPY-'.strtoupper(\Illuminate\Support\Str::random(6)),
+                        'status' => 'draft',
+                        'published_at' => null,
+                        'results_published_at' => null,
+                    ])->save();
+                }),
+            DeleteAction::make()->label('Supprimer')->visible(fn (): bool => Gate::allows('calls.update')),
         ]);
     }
 

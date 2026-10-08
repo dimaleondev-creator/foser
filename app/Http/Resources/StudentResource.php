@@ -9,7 +9,9 @@ class StudentResource extends ApiResource
 	public function toArray(\Illuminate\Http\Request $request): array
 	{
 		$data = parent::toArray($request);
-		$data['inee'] = (string) \Illuminate\Support\Facades\DB::table('student_profiles')->where('user_id', $this->id)->value('inee');
+		if (! $request->user()?->hasRole('universite') && $request->user()?->can('users.view')) {
+			$data['inee'] = (string) \Illuminate\Support\Facades\DB::table('student_profiles')->where('user_id', $this->id)->value('inee');
+		}
 
 		return $data;
 	}

@@ -30,11 +30,11 @@ class ProgramResource extends Resource
     public static function form(Schema $schema): Schema { return $schema->components([
         TextInput::make('name')->required()->maxLength(255), TextInput::make('code')->required()->unique(ignoreRecord: true),
         Select::make('type')->options(['education'=>'Éducation','research'=>'Recherche','innovation'=>'Innovation'])->required(),
-        Textarea::make('description')->columnSpanFull(), TextInput::make('budget')->numeric()->minValue(0), TextInput::make('currency')->default('GNF')->length(3),
+        Textarea::make('description')->columnSpanFull(), TextInput::make('budget')->numeric()->minValue(0), TextInput::make('currency')->default('FCFA')->length(4),
         DatePicker::make('starts_at'), DatePicker::make('ends_at'), Select::make('status')->options(['draft'=>'Brouillon','published'=>'Publié','closed'=>'Clôturé'])->required(),
     ]); }
     public static function table(Table $table): Table { return $table->columns([
-        TextColumn::make('name')->searchable()->sortable(), TextColumn::make('code')->searchable(), TextColumn::make('type')->badge(), TextColumn::make('status')->badge(), TextColumn::make('budget')->money('GNF'), TextColumn::make('updated_at')->dateTime()->sortable(),
+        TextColumn::make('name')->searchable()->sortable(), TextColumn::make('code')->searchable(), TextColumn::make('type')->badge(), TextColumn::make('status')->badge(), TextColumn::make('budget')->money('FCFA'), TextColumn::make('updated_at')->dateTime()->sortable(),
     ])->recordActions([EditAction::make()->visible(fn()=>Gate::allows('programs.update')), DeleteAction::make()->visible(fn()=>Gate::allows('programs.delete'))]); }
     public static function getPages(): array { return ['index'=>ManagePrograms::route('/')]; }
 }

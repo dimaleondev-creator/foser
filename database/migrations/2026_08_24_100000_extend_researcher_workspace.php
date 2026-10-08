@@ -17,7 +17,7 @@ return new class extends Migration
 
         Schema::table('research_projects', function (Blueprint $table): void {
             $table->decimal('budget', 15, 2)->nullable()->after('abstract');
-            $table->string('currency', 3)->default('GNF')->after('budget');
+            $table->string('currency', 4)->default('FCFA')->after('budget');
         });
 
         Schema::table('research_publications', function (Blueprint $table): void {

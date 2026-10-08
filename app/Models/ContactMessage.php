@@ -21,4 +21,11 @@ class ContactMessage extends Model
         'ip_address',
         'user_agent',
     ];
+
+    public function replies()
+    {
+        return $this->hasMany(ContactMessageReply::class)->orderBy('created_at');
+    }
+
+    protected $casts = ['read_at' => 'datetime', 'closed_at' => 'datetime'];
 }

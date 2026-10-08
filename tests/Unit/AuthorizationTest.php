@@ -18,7 +18,7 @@ class AuthorizationTest extends TestCase
         $user = Mockery::mock(User::class)->makePartial();
         $user->email_verified_at = now();
         $user->status = 'active';
-        $user->shouldReceive('hasAnyPermission')->once()->andReturnTrue();
+        $user->account_type = 'admin';
 
         $this->assertTrue($user->canAccessPanel(Panel::make()->id('admin')));
     }
@@ -27,7 +27,7 @@ class AuthorizationTest extends TestCase
         $user = Mockery::mock(User::class)->makePartial();
         $user->email_verified_at = now();
         $user->status = 'active';
-        $user->shouldReceive('hasAnyPermission')->once()->andReturnFalse();
+        $user->account_type = 'etudiant';
 
         $this->assertFalse($user->canAccessPanel(Mockery::mock(Panel::class)));
     }

@@ -15,8 +15,12 @@ class CandidateApplicationController
     public function index(Request $request): JsonResponse
     {
         $user = $this->user($request);
-        $applications = DB::table('applications')->where('applicant_id', $user->id)->latest()->paginate(20)->withQueryString();
-        return response()->json(['data' => CandidateApplicationResource::collection($applications->items()), 'meta' => ['current_page' => $applications->currentPage(), 'last_page' => $applications->lastPage(), 'total' => $applications->total()]]);
+        $filters = $request->validate(['page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', 'min:1', 'max:100'], 'status' => ['nullable', 'string', 'max:40'], 'search' => ['nullable', 'string', 'max:100']]);
+        $applications = DB::table('applications')->where('applicant_id', $user->id)
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['search'] ?? null, fn ($query, string $term) => $query->where(fn ($search) => $search->where('reference', 'like', "%{$term}%")->orWhere('project_title', 'like', "%{$term}%")))
+            ->latest()->paginate($filters['per_page'] ?? 20)->withQueryString();
+        return response()->json(['data' => CandidateApplicationResource::collection($applications->items()), 'meta' => ['current_page' => $applications->currentPage(), 'last_page' => $applications->lastPage(), 'per_page' => $applications->perPage(), 'total' => $applications->total()]]);
     }
 
     public function store(Request $request, StudentApplicationWorkflow $workflow): JsonResponse

@@ -18,14 +18,22 @@ use App\Filament\Widgets\FinancialStatsOverview;
 use App\Filament\Widgets\ApplicationsAnnualChart;
 use App\Filament\Widgets\ApplicationsDistributionChart;
 use App\Filament\Widgets\FinancialComparisonChart;
+use App\Filament\Widgets\FinancialProgramBreakdown;
+use App\Filament\Widgets\ApplicationsByUniversityChart;
+use App\Filament\Widgets\ApplicationsBySexChart;
+use App\Filament\Widgets\ApplicationsByRegionChart;
+use App\Filament\Widgets\CommissionOverview;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use App\Models\User;
+use App\Models\SystemSetting;
 use App\Http\Middleware\SetLocale;
 
 class AdminPanelProvider extends PanelProvider
@@ -36,6 +44,17 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandName('')
+            ->brandLogo(function (): string {
+                /** @var FilesystemAdapter $disk */
+                $disk = Storage::disk('public');
+
+                return $disk->url(SystemSetting::query()
+                    ->where('key', 'site_logo')
+                    ->where('is_public', true)
+                    ->value('value') ?? 'site/logo-foser.png');
+            })
+            ->brandLogoHeight('3rem')
             ->login()
             ->multiFactorAuthentication(
                 [app(AppAuthentication::class)],
@@ -63,6 +82,11 @@ class AdminPanelProvider extends PanelProvider
                 ApplicationsAnnualChart::class,
                 ApplicationsDistributionChart::class,
                 FinancialComparisonChart::class,
+                FinancialProgramBreakdown::class,
+                ApplicationsByUniversityChart::class,
+                ApplicationsBySexChart::class,
+                ApplicationsByRegionChart::class,
+                CommissionOverview::class,
                 AccountWidget::class,
             ])
             ->middleware([

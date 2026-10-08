@@ -11,5 +11,5 @@ class FinancePage extends SectionPage
     protected static string|UnitEnum|null $navigationGroup = 'FINANCES';
     protected static string $module = 'Finances';
     protected static array $permissions = ['finance.view'];
-    protected static array $items = ['Engagements', 'Decaissements', 'Paiements'];
+    protected static array $items = ['Engagements', 'Décaissements', 'Paiements'];
 }

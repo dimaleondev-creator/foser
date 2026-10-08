@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ApplicationStatus;
+use App\Models\Disbursement;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -14,14 +15,16 @@ class ApplicationWorkflowService
 
     public function submitApplication(User $student, string $applicationId): void
     {
-        $application = DB::table('applications')->where('id', $applicationId)->where('applicant_id', $student->id)->firstOrFail();
-        abort_unless($application->workflow_status === ApplicationStatus::DRAFT->value, 422);
-        $this->assertOpenCall($application->call_id);
-        $result = $this->completeness->check($applicationId);
-        if (! $result['is_complete']) {
-            throw ValidationException::withMessages(['application' => 'Le dossier est incomplet.', 'missing_fields' => implode(', ', $result['missing_fields']), 'missing_documents' => implode(', ', $result['missing_documents'])]);
-        }
-        $this->transition($application, $student, ApplicationStatus::SUBMITTED, ['submitted_by' => $student->id, 'submitted_at' => now()]);
+        DB::transaction(function () use ($student, $applicationId): void {
+            $application = DB::table('applications')->where('id', $applicationId)->where('applicant_id', $student->id)->lockForUpdate()->firstOrFail();
+            abort_unless($application->workflow_status === ApplicationStatus::DRAFT->value, 422);
+            app(CallCapacityService::class)->lockAndAssertAvailable($application->call_id, $applicationId);
+            $result = $this->completeness->check($applicationId);
+            if (! $result['is_complete']) {
+                throw ValidationException::withMessages(['application' => 'Le dossier est incomplet.', 'missing_fields' => implode(', ', $result['missing_fields']), 'missing_documents' => implode(', ', $result['missing_documents'])]);
+            }
+            $this->transition($application, $student, ApplicationStatus::SUBMITTED, ['submitted_by' => $student->id, 'submitted_at' => now()]);
+        });
     }
 
     public function verifyCompleteness(User $operator, string $applicationId): void
@@ -73,7 +76,7 @@ class ApplicationWorkflowService
         $application = DB::table('applications')->where('id', $applicationId)->firstOrFail();
         abort_unless($application->workflow_status === ApplicationStatus::EVALUATION->value, 422);
         abort_unless(DB::table('evaluations')->where('application_id', $applicationId)->exists(), 422);
-        abort_unless(! DB::table('evaluations')->where('application_id', $applicationId)->where('status', '!=', 'submitted')->exists(), 422, 'Toutes les évaluations doivent être soumises.');
+        abort_unless(! DB::table('evaluations')->where('application_id', $applicationId)->where('status', '!=', 'validated')->exists(), 422, 'Toutes les évaluations doivent être validées.');
         $this->transition($application, $operator, ApplicationStatus::COMMISSION_REVIEW);
     }
 
@@ -106,13 +109,15 @@ class ApplicationWorkflowService
     {
         $this->authorize($operator, 'applications.award', 'applications.validate');
         $application = DB::table('applications')->where('id', $applicationId)->firstOrFail();
+        abort_unless($application->workflow_status === ApplicationStatus::RESULT_PUBLISHED->value, 422);
         $result = DB::table('application_results')->where('application_id', $applicationId)->where('decision', 'accepted')->firstOrFail();
         abort_unless($result->published_at, 422);
         $maximum = DB::table('calls')->where('id', $application->call_id)->value('maximum_project_amount');
-        abort_unless($amount >= 0 && (! $maximum || $amount <= (float) $maximum), 422, 'Le montant attribué dépasse le montant autorisé.');
+        abort_unless($amount > 0 && (! $maximum || $amount <= (float) $maximum), 422, 'Le montant attribué dépasse le montant autorisé.');
         return DB::transaction(function () use ($operator, $application, $amount, $result): object {
             $id = (string) Str::uuid();
             DB::table('application_awards')->updateOrInsert(['application_id' => $application->id], ['id' => $id, 'beneficiary_id' => $application->applicant_id, 'program_id' => $application->program_id, 'amount' => $amount, 'award_date' => today(), 'decision_reference' => $application->reference, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
+            $this->recordFinancialAudit($operator, 'application_awards', $id, 'financial.award_created', [], ['application_id' => $application->id, 'beneficiary_id' => $application->applicant_id, 'program_id' => $application->program_id, 'amount' => $amount, 'decision_reference' => $application->reference]);
             $this->transition($application, $operator, ApplicationStatus::AWARDED);
             app(AuditLogger::class)->record('application.awarded', 'application_awards', $id, [], ['application_id' => $application->id, 'amount' => $amount, 'decision' => $result->decision]);
             return DB::table('application_awards')->where('application_id', $application->id)->first();
@@ -121,22 +126,27 @@ class ApplicationWorkflowService
 
     public function sendToFinance(User $operator, string $applicationId): void
     {
-        $this->authorize($operator, 'applications.finance', 'finance.manage');
+        $this->authorize($operator, 'applications.finance', 'finance.authorize', 'finance.manage');
         $application = DB::table('applications')->where('id', $applicationId)->firstOrFail();
         abort_unless($application->workflow_status === ApplicationStatus::AWARDED->value, 422);
         $this->transition($application, $operator, ApplicationStatus::FINANCE_PENDING);
     }
 
-    public function createFinancialCommitment(User $operator, string $applicationId, float $amount, string $currency = 'GNF'): object
+    public function createFinancialCommitment(User $operator, string $applicationId, float $amount, string $currency = 'FCFA'): object
     {
         $this->authorize($operator, 'applications.finance', 'finance.manage');
         $application = DB::table('applications')->where('id', $applicationId)->firstOrFail();
-        abort_unless($application->workflow_status === ApplicationStatus::FINANCE_PENDING->value, 422);
+        abort_unless(in_array($application->workflow_status, [ApplicationStatus::AWARDED->value, ApplicationStatus::FINANCE_PENDING->value], true), 422);
         $award = DB::table('application_awards')->where('application_id', $applicationId)->firstOrFail();
-        abort_unless($amount >= 0 && $amount <= (float) $award->amount, 422, 'L’engagement dépasse l’attribution.');
+        abort_unless($amount > 0 && $amount <= (float) $award->amount, 422, 'L’engagement dépasse l’attribution.');
         return DB::transaction(function () use ($operator, $application, $amount, $currency): object {
+            if ($application->workflow_status === ApplicationStatus::AWARDED->value) {
+                $this->transition($application, $operator, ApplicationStatus::FINANCE_PENDING);
+                $application = (object) [...(array) $application, 'workflow_status' => ApplicationStatus::FINANCE_PENDING->value];
+            }
             $id = (string) Str::uuid();
-            DB::table('financial_commitments')->insert(['id' => $id, 'application_id' => $application->id, 'beneficiary_id' => $application->applicant_id, 'reference' => 'ENG-'.$application->reference, 'amount' => $amount, 'currency' => $currency, 'status' => 'soumis', 'committed_at' => today(), 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('financial_commitments')->insert(['id' => $id, 'application_id' => $application->id, 'program_id' => $application->program_id, 'beneficiary_id' => $application->applicant_id, 'reference' => 'ENG-'.$application->reference, 'amount' => $amount, 'budget' => $amount, 'currency' => $currency, 'fiscal_year' => today()->year, 'status' => 'soumis', 'committed_at' => today(), 'created_at' => now(), 'updated_at' => now()]);
+            $this->recordFinancialAudit($operator, 'financial_commitments', $id, 'financial.commitment_created', [], ['application_id' => $application->id, 'program_id' => $application->program_id, 'beneficiary_id' => $application->applicant_id, 'amount' => $amount, 'budget' => $amount, 'fiscal_year' => today()->year]);
             $this->transition($application, $operator, ApplicationStatus::COMMITTED);
             return DB::table('financial_commitments')->where('id', $id)->first();
         });
@@ -144,14 +154,17 @@ class ApplicationWorkflowService
 
     public function prepareDisbursement(User $operator, string $applicationId, float $amount): object
     {
-        $this->authorize($operator, 'applications.disburse', 'finance.manage');
+        $this->authorize($operator, 'applications.disburse', 'finance.authorize', 'finance.manage');
         $application = DB::table('applications')->where('id', $applicationId)->firstOrFail();
-        abort_unless($application->workflow_status === ApplicationStatus::COMMITTED->value, 422);
-        $commitment = DB::table('financial_commitments')->where('application_id', $applicationId)->where('status', 'soumis')->firstOrFail();
-        abort_unless($amount <= (float) $commitment->amount, 422, 'Le décaissement dépasse l’engagement.');
+        abort_unless(in_array($application->workflow_status, [ApplicationStatus::COMMITTED->value, ApplicationStatus::DISBURSED->value], true), 422);
+        $commitment = DB::table('financial_commitments')->where('application_id', $applicationId)->whereIn('status', ['soumis', 'valide'])->firstOrFail();
+        $alreadyScheduled = (float) DB::table('disbursements')->where('commitment_id', $commitment->id)->sum('amount');
+        abort_unless($amount > 0 && $alreadyScheduled + $amount <= (float) $commitment->amount, 422, 'Le montant du décaissement dépasse le solde engagé.');
         return DB::transaction(function () use ($operator, $application, $commitment, $amount): object {
             $id = (string) Str::uuid();
-            DB::table('disbursements')->insert(['id' => $id, 'commitment_id' => $commitment->id, 'reference' => 'DEC-'.$application->reference, 'amount' => $amount, 'status' => 'planned', 'scheduled_for' => today(), 'created_at' => now(), 'updated_at' => now()]);
+            $installmentNumber = DB::table('disbursements')->where('commitment_id', $commitment->id)->count() + 1;
+            DB::table('disbursements')->insert(['id' => $id, 'commitment_id' => $commitment->id, 'reference' => 'DEC-'.$application->reference.($installmentNumber > 1 ? '-TRANCHE-'.$installmentNumber : ''), 'amount' => $amount, 'installment_number' => $installmentNumber, 'status' => 'planned', 'scheduled_for' => today(), 'created_at' => now(), 'updated_at' => now()]);
+            $this->recordFinancialAudit($operator, 'disbursements', $id, 'financial.disbursement_created', [], ['commitment_id' => $commitment->id, 'amount' => $amount, 'installment_number' => $installmentNumber]);
             $this->transition($application, $operator, ApplicationStatus::DISBURSEMENT_PENDING);
             return DB::table('disbursements')->where('id', $id)->first();
         });
@@ -159,12 +172,16 @@ class ApplicationWorkflowService
 
     public function completeDisbursement(User $operator, string $applicationId, string $paymentReference): void
     {
-        $this->authorize($operator, 'applications.disburse', 'finance.manage');
+        $this->authorize($operator, 'applications.disburse', 'finance.execute', 'finance.manage');
         $application = DB::table('applications')->where('id', $applicationId)->firstOrFail();
         abort_unless($application->workflow_status === ApplicationStatus::DISBURSEMENT_PENDING->value, 422);
         $disbursement = DB::table('disbursements')->join('financial_commitments', 'financial_commitments.id', '=', 'disbursements.commitment_id')->where('financial_commitments.application_id', $applicationId)->where('disbursements.status', 'planned')->select('disbursements.*')->firstOrFail();
         DB::transaction(function () use ($operator, $application, $disbursement, $paymentReference): void {
+            $paymentService = app(FinancialPaymentService::class);
+            $payment = $paymentService->initiate(Disbursement::query()->findOrFail($disbursement->id), $operator, ['amount' => $disbursement->amount, 'reference' => $paymentReference], 'workflow-disbursement:'.$disbursement->id);
+            $paymentService->transition($payment, 'paid', $operator, $paymentReference);
             DB::table('disbursements')->where('id', $disbursement->id)->update(['status' => 'execute', 'disbursed_at' => today(), 'executed_at' => now(), 'processed_by' => $operator->id, 'comment' => $paymentReference, 'updated_at' => now()]);
+            $this->recordFinancialAudit($operator, 'disbursements', $disbursement->id, 'financial.disbursement_completed', ['status' => $disbursement->status], ['status' => 'execute', 'payment_reference' => $paymentReference]);
             $this->transition($application, $operator, ApplicationStatus::DISBURSED, ['decided_at' => now()]);
         });
     }
@@ -185,9 +202,18 @@ class ApplicationWorkflowService
         abort_unless(collect($permissions)->contains(fn (string $permission): bool => $operator->can($permission)), 403);
     }
 
-    private function assertOpenCall(string $callId): void
+    private function recordFinancialAudit(User $actor, string $operationType, string $operationId, string $event, array $oldValues, array $newValues): void
     {
-        abort_unless(DB::table('calls')->where('id', $callId)->where('status', 'published')->whereDate('opens_at', '<=', today())->whereDate('closes_at', '>=', today())->exists(), 422, 'L’appel est fermé.');
+        DB::table('financial_audit_logs')->insert([
+            'id' => (string) Str::uuid(),
+            'user_id' => $actor->id,
+            'operation_type' => $operationType,
+            'operation_id' => $operationId,
+            'event' => $event,
+            'old_values' => json_encode($oldValues),
+            'new_values' => json_encode($newValues),
+            'created_at' => now(),
+        ]);
     }
 
     private function legacyStatus(ApplicationStatus $status): string

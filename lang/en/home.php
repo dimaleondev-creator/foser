@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'description' => 'FOSER, the Burkina Faso Fund for Education and Research Support.',
+    'title' => 'FOSER | Education, research and innovation',
+    'og_description' => 'A public service supporting learning, knowledge and the solutions of tomorrow.',
+    'contact' => 'Contact us',
+    'brand_description' => 'Fund for Education and Research Support',
+    'menu_open' => 'Open menu',
+    'nav_label' => 'Main navigation',
+    'nav_home' => 'Home',
+    'nav_institution' => 'About FOSER',
+    'nav_programs' => 'Our programs',
+    'nav_calls' => 'Calls for applications',
+    'nav_publications' => 'Publications',
+    'nav_register' => 'Register',
+    'hero_eyebrow' => 'OFFICIAL PORTAL · BURKINA FASO',
+    'hero_title' => 'Investing in Burkina Faso’s future',
+    'hero_title_emphasis' => 'through education and research.',
+    'hero_copy' => 'FOSER supports students, researchers and institutions throughout their academic and scientific journeys.',
+    'hero_programs' => 'Explore our programs',
+    'hero_about' => 'Discover our mission',
+    'portal_label' => 'Access your portal',
+    'portal_student' => 'Student portal',
+    'portal_researcher' => 'Create a researcher account',
+    'portal_university' => 'University portal',
+    'hero_note' => 'Our commitment',
+];

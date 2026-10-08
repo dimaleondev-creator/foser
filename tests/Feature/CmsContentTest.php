@@ -24,4 +24,21 @@ class CmsContentTest extends TestCase
 
         $this->get('/about')->assertOk()->assertDontSee('Brouillon privé');
     }
+
+    public function test_scheduled_institutional_content_is_not_rendered_early(): void
+    {
+        CmsContent::create([
+            'content_key' => 'institution.historique',
+            'locale' => 'fr',
+            'title' => 'Historique programmé',
+            'body' => 'Texte confidentiel avant publication.',
+            'status' => 'published',
+            'published_at' => now()->addDay(),
+        ]);
+
+        $this->get('/le-foser/historique')
+            ->assertOk()
+            ->assertDontSee('Historique programmé')
+            ->assertDontSee('Texte confidentiel avant publication.');
+    }
 }

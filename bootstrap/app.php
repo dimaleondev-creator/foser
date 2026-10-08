@@ -14,6 +14,7 @@ use App\Http\Middleware\EnsureDashboardRole;
 use App\Http\Middleware\EnsureUniversityResponsible;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\ApiResponseEnvelope;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [SetLocale::class]);
+        $middleware->api(append: [ApiResponseEnvelope::class]);
         $middleware->append(SecurityHeaders::class);
         $middleware->alias([
             'permission' => EnsurePermission::class,
@@ -45,7 +47,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 $exception instanceof HttpExceptionInterface => $exception->getStatusCode(),
                 default => 500,
             };
-            $response = ['message' => $status === 500 ? 'Une erreur interne est survenue.' : $exception->getMessage()];
+            $response = [
+                'success' => false,
+                'data' => null,
+                'message' => $status === 500 ? 'Une erreur interne est survenue.' : $exception->getMessage(),
+                'errors' => null,
+                'pagination' => null,
+            ];
 
             if ($exception instanceof ValidationException) {
                 $status = 422;

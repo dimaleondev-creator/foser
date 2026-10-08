@@ -13,7 +13,29 @@ class ProgramsController extends Controller
 {
     public function index(): View
     {
-        return view('programs.index', ['catalog' => $this->catalog()]);
+        $catalog = $this->catalog();
+        $catalog[0]['count'] = DB::table('financial_aids')->join('programs', 'programs.id', '=', 'financial_aids.program_id')->where('financial_aids.status', 'active')->whereIn('programs.status', ['published', 'active'])->whereNull('programs.deleted_at')->count();
+        $catalog[1]['count'] = DB::table('study_loans')->join('programs', 'programs.id', '=', 'study_loans.program_id')->where('study_loans.status', 'active')->whereIn('programs.status', ['published', 'active'])->whereNull('programs.deleted_at')->count();
+        $catalog[2]['count'] = DB::table('research_programs')->join('programs', 'programs.id', '=', 'research_programs.program_id')->where('research_programs.status', 'active')->whereIn('programs.status', ['published', 'active'])->whereNull('programs.deleted_at')->count();
+        $catalog[3]['count'] = DB::table('innovation_programs')->join('programs', 'programs.id', '=', 'innovation_programs.program_id')->where('innovation_programs.status', 'active')->whereIn('programs.status', ['published', 'active'])->whereNull('programs.deleted_at')->count();
+
+        $openCalls = DB::table('calls')->join('programs', 'programs.id', '=', 'calls.program_id')
+            ->where('calls.status', 'published')->whereIn('programs.status', ['published', 'active'])
+            ->whereDate('calls.opens_at', '<=', today())->whereDate('calls.closes_at', '>=', today())
+            ->orderBy('calls.closes_at')->limit(6)->get(['calls.id', 'calls.title', 'calls.reference', 'calls.closes_at', 'programs.name as program_name']);
+
+        return view('programs.index', [
+            'catalog' => $catalog,
+            'openCalls' => $openCalls,
+            'faqs' => ProgramFaq::query()->where('status', 'published')->whereIn('category', ['aides-financieres', 'prets-etudes', 'recherche', 'innovation'])->orderBy('sort_order')->orderBy('question')->limit(5)->get(),
+            'stats' => [
+                'students' => DB::table('student_profiles')->whereNull('deleted_at')->count(),
+                'researchers' => DB::table('researcher_profiles')->whereIn('status', ['approved', 'active'])->whereNull('deleted_at')->count(),
+                'projects' => DB::table('research_projects')->where('status', 'funded')->whereNull('deleted_at')->count(),
+                'universities' => DB::table('universities')->where('status', 'active')->whereNull('deleted_at')->count(),
+                'committed' => (float) DB::table('financial_commitments')->whereIn('status', ['approved', 'valide', 'execute'])->sum('amount'),
+            ],
+        ]);
     }
 
     public function category(string $category)

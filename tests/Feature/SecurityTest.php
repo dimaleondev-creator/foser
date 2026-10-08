@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SecurityTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_security_headers_are_present_on_web_responses(): void
     {
         $this->get('/student/login')

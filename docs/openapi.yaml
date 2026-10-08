@@ -27,6 +27,12 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/SingleResource' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /users/me:
+    get:
+      summary: Current authenticated user (alias of auth/me)
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /auth/logout:
     delete:
       summary: Revoke the current token
@@ -72,6 +78,74 @@ paths:
       summary: Public aggregated statistics by region
       parameters:
         - { name: year, in: query, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /results:
+    get:
+      summary: Published results visible to the caller (owner, assigned evaluator, tenant or authorized staff)
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /awards:
+    get:
+      summary: Active awards for the beneficiary or finance-authorized staff
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /disbursements:
+    get:
+      summary: Financial disbursements (finance.view required)
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { name: status, in: query, schema: { type: string, maxLength: 30 } }
+        - { name: application_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /news:
+    get:
+      security: []
+      summary: Search published public news
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 2, maxLength: 100 } }
+        - { name: category, in: query, schema: { type: string, maxLength: 100 } }
+        - { $ref: '#/components/parameters/Page' }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /news/{slug}:
+    get:
+      security: []
+      summary: Retrieve a published public news article
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '404': { description: Article unavailable }
+  /public/documents:
+    get:
+      security: []
+      summary: Search published public documents without exposing storage paths
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 2, maxLength: 100 } }
+        - { name: category, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: year, in: query, schema: { type: integer, minimum: 1900, maximum: 2100 } }
+        - { name: language, in: query, schema: { type: string, maxLength: 10 } }
+        - { $ref: '#/components/parameters/Page' }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
       responses:
         '200': { $ref: '#/components/responses/Collection' }
         '422': { $ref: '#/components/responses/ValidationError' }
@@ -126,6 +200,143 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Document is unavailable }
+  /researchers/me:
+    get:
+      summary: Current researcher profile
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /researchers/projects:
+    get:
+      summary: Projects owned by or shared with the authenticated researcher
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { name: status, in: query, schema: { type: string, maxLength: 30 } }
+        - { $ref: '#/components/parameters/Search' }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /university/students:
+    get:
+      summary: Students belonging to the authenticated university only
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { $ref: '#/components/parameters/Search' }
+        - { name: status, in: query, schema: { type: string, maxLength: 40 } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /university/applications:
+    get:
+      summary: Applications belonging to the authenticated university only
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { name: status, in: query, schema: { type: string, maxLength: 40 } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /candidatures:
+    servers:
+      - url: /api/candidate
+    get:
+      summary: Current student’s applications
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { name: status, in: query, schema: { type: string, maxLength: 40 } }
+        - { $ref: '#/components/parameters/Search' }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      summary: Create a student application draft
+      responses:
+        '201': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /assignments:
+    servers:
+      - url: /api/evaluator
+    get:
+      summary: Evaluations assigned to the current evaluator
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { name: status, in: query, schema: { type: string, maxLength: 30 } }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /assignments/{id}:
+    servers:
+      - url: /api/evaluator
+    get:
+      summary: Retrieve an evaluation assigned to the authenticated evaluator
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Assignment is not assigned to caller }
+  /candidatures/{id}:
+    servers:
+      - url: /api/candidate
+    get:
+      summary: Retrieve an application owned by the authenticated student
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Application is not owned by caller }
+    put:
+      summary: Update an owned editable application draft
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CandidateApplicationUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Application is not owned by caller }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /applications/{application}/submit:
+    servers:
+      - url: /api
+    post:
+      summary: Submit the authenticated student’s application draft
+      parameters:
+        - { name: application, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Application is not owned by caller }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /university/applications/{application}/validate:
+    post:
+      summary: Validate an application in the authenticated university tenant
+      parameters:
+        - { name: application, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/SingleResource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Application is outside the caller tenant }
+        '422': { $ref: '#/components/responses/ValidationError' }
 components:
   securitySchemes:
     sanctumBearer:
@@ -147,11 +358,38 @@ components:
       properties:
         email: { type: string, format: email }
         password: { type: string, format: password }
+    CandidateApplicationUpdate:
+      type: object
+      required: [project_title, summary, description, domain, objectives, methodology, calendar, budget]
+      properties:
+        project_title: { type: string, maxLength: 255 }
+        summary: { type: string, maxLength: 2000 }
+        description: { type: string, maxLength: 10000 }
+        domain: { type: string, maxLength: 255 }
+        objectives: { type: string, maxLength: 5000 }
+        methodology: { type: string, maxLength: 10000 }
+        calendar: { type: string, maxLength: 5000 }
+        budget: { type: number, minimum: 0 }
+        team: { type: string, nullable: true, maxLength: 5000 }
+        applicant_note: { type: string, nullable: true, maxLength: 5000 }
     ApiResponse:
       type: object
+      required: [success, data, message, errors, pagination]
       properties:
+        success: { type: boolean }
         data: {}
-        meta: { type: object }
+        message: { type: string, nullable: true }
+        errors: { type: object, nullable: true, additionalProperties: { type: array, items: { type: string } } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+        meta: { allOf: [{ $ref: '#/components/schemas/Pagination' }], deprecated: true, description: Backward-compatible alias for pagination }
+    Pagination:
+      type: object
+      nullable: true
+      properties:
+        current_page: { type: integer }
+        last_page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer }
     AssistantQuestion:
       type: object
       required: [question]

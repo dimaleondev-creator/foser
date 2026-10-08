@@ -72,7 +72,7 @@ return new class extends Migration
             $table->string('type', 40)->index();
             $table->text('description')->nullable();
             $table->decimal('budget', 15, 2)->nullable();
-            $table->string('currency', 3)->default('GNF');
+            $table->string('currency', 4)->default('FCFA');
             $table->date('starts_at')->nullable();
             $table->date('ends_at')->nullable();
             $table->string('status', 30)->default('draft')->index();
@@ -359,7 +359,7 @@ return new class extends Migration
             $table->foreignUuid('research_project_id')->nullable()->constrained()->nullOnDelete();
             $table->string('reference')->unique();
             $table->decimal('amount', 15, 2);
-            $table->string('currency', 3)->default('GNF');
+            $table->string('currency', 4)->default('FCFA');
             $table->string('status', 30)->default('approved')->index();
             $table->date('committed_at');
             $table->timestamps();

@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Resources\NotificationResource;
 use App\Models\NotificationDelivery;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends ApiController
 {
@@ -15,9 +15,8 @@ class NotificationController extends ApiController
     protected array $filterable = ['channel', 'status'];
     protected array $sortable = ['sent_at', 'created_at'];
 
-    protected function applyQuery(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
+    protected function scopeQuery(Builder $query, Request $request): void
     {
-        $query->where('user_id', Auth::id());
-        parent::applyQuery($query, $filters);
+        $query->where('user_id', $request->user()->id);
     }
 }

@@ -45,7 +45,7 @@ class ResearchProjectResource extends Resource
                 TextInput::make('year')->label('Année')->numeric(),
                 TextInput::make('budget')->numeric()->minValue(0),
                 TextInput::make('funded_amount')->label('Montant financé')->numeric()->minValue(0),
-                TextInput::make('currency')->default('GNF')->length(3),
+                TextInput::make('currency')->default('FCFA')->length(4),
                 Select::make('status')->options(['draft' => 'Brouillon', 'submitted' => 'Soumis', 'under_review' => 'En évaluation', 'accepted' => 'Accepté', 'rejected' => 'Rejeté', 'funded' => 'Financé'])->required(),
                 DatePicker::make('starts_at'),
                 DatePicker::make('ends_at'),
@@ -60,7 +60,7 @@ class ResearchProjectResource extends Resource
             TextColumn::make('reference')->searchable(),
             TextColumn::make('title')->searchable()->sortable(),
             TextColumn::make('status')->badge(),
-            TextColumn::make('budget')->money('GNF'),
+            TextColumn::make('budget')->money('FCFA'),
             TextColumn::make('updated_at')->dateTime()->sortable(),
         ])->recordActions([EditAction::make()]);
     }

@@ -11,5 +11,17 @@ class CommunicationPage extends SectionPage
     protected static string|UnitEnum|null $navigationGroup = 'COMMUNICATION';
     protected static string $module = 'Communication';
     protected static array $permissions = ['content.view', 'calls.view'];
-    protected static array $items = ['Actualites', 'Communiques', 'Evenements', 'Newsletter'];
+    protected static array $items = [
+        'Actualités et articles',
+        'Communiqués',
+        'Événements',
+        'Galeries photos',
+        'Vidéos',
+        'Témoignages',
+        'Partenaires',
+        'Abonnés newsletter',
+        'Campagnes newsletter',
+        'Pages institutionnelles',
+        'Messages de contact',
+    ];
 }

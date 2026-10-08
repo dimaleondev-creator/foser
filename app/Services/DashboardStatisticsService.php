@@ -17,19 +17,28 @@ class DashboardStatisticsService
         return Cache::remember($this->key('summary', $filters), now()->addSeconds(60), function () use ($filters): array {
             $profiles = $this->profileQuery($filters);
             $applications = $this->applicationQuery($filters);
-            $counts = $applications->selectRaw("count(*) as deposited, sum(case when applications.status in ('accepted','eligible','valide','approuve') then 1 else 0 end) as validated, sum(case when applications.status in ('rejected','rejete') then 1 else 0 end) as rejected, sum(case when applications.status in ('submitted','under_review','verification','evaluation','soumis') then 1 else 0 end) as pending")->first();
+            $status = "coalesce(applications.workflow_status, applications.status)";
+            $counts = $applications->selectRaw("count(*) as deposited, sum(case when {$status} in ('accepted','eligible','valide','approuve','university_review','evaluation','commission_review','decision_made','result_published','awarded','committed','disbursement_pending','disbursed') then 1 else 0 end) as validated, sum(case when {$status} in ('rejected','rejete') then 1 else 0 end) as rejected, sum(case when {$status} in ('submitted','under_review','verification','soumis','completeness_check','documents_pending','evaluator_assignment','evaluation','commission_review','finance_pending') then 1 else 0 end) as pending")->first();
             $deposited = (int) ($counts->deposited ?? 0);
             $validated = (int) ($counts->validated ?? 0);
             $rejected = (int) ($counts->rejected ?? 0);
 
             return [
-                'students' => (int) $profiles->count(), 'applications' => $deposited,
+                'students' => (int) $profiles->count(),
+                'researchers' => (int) DB::table('researcher_profiles')->whereIn('status', ['approved', 'active'])->count(),
+                'universities' => (int) DB::table('universities')->where('status', 'active')->count(),
+                'active_programs' => (int) DB::table('programs')->whereIn('status', ['active', 'published'])->count(),
+                'beneficiaries' => (int) DB::table('application_awards')->whereIn('status', ['active', 'approved'])->distinct('beneficiary_id')->count('beneficiary_id'),
+                'new_students' => (int) $profiles->where('student_profiles.created_at', '>=', now()->subDays(30))->count(),
+                'open_calls' => (int) DB::table('calls')->whereIn('status', ['open', 'published'])->whereDate('opens_at', '<=', today())->where(fn ($query) => $query->whereNull('closes_at')->orWhereDate('closes_at', '>=', today()))->count(),
+                'applications' => $deposited,
                 'validated' => $validated, 'rejected' => $rejected, 'pending' => (int) ($counts->pending ?? 0),
                 'committed' => $this->amountQuery('financial_commitments', 'amount', 'valide', $filters),
                 'disbursed' => $this->amountQuery('disbursements', 'amount', 'execute', $filters),
                 'paid' => $this->paidAmount($filters),
                 'funded_projects' => $this->projectCount($filters),
                 'treatment_rate' => $deposited > 0 ? round((($validated + $rejected) / $deposited) * 100, 2) : 0,
+                'remaining' => max(0, $this->amountQuery('financial_commitments', 'amount', 'valide', $filters) - $this->amountQuery('disbursements', 'amount', 'execute', $filters)),
             ];
         });
     }
@@ -44,7 +53,7 @@ class DashboardStatisticsService
             'universities' => $this->groupApplications('universities.name', $filters, $limit),
             'programs' => $this->groupApplications('programs.name', $filters, $limit),
             'sex' => $this->groupApplications('student_profiles.sex', $filters, $limit),
-            'statuses' => $this->groupApplications('applications.status', $filters, $limit),
+            'statuses' => $this->groupApplications('coalesce(applications.workflow_status, applications.status)', $filters, $limit),
             'finance' => $this->financialComparison($filters),
         ]);
     }
@@ -64,6 +73,44 @@ class DashboardStatisticsService
                 ->map(fn ($row): array => ['region' => $row->region, 'beneficiaries' => (int) $row->beneficiaries, 'applications' => (int) $row->applications, 'funded_projects' => (int) $row->funded_projects])
                 ->all();
         });
+    }
+
+    public function universities(array $filters = [], int $limit = 100): array
+    {
+        return $this->applicationBreakdown('universities.id', 'universities.name', $filters, $limit, true);
+    }
+
+    public function programs(array $filters = [], int $limit = 100): array
+    {
+        return $this->applicationBreakdown('programs.id', 'programs.name', $filters, $limit, false);
+    }
+
+    public function gender(array $filters = []): array
+    {
+        return $this->applicationBreakdown('student_profiles.sex', 'student_profiles.sex', $filters, 20, false);
+    }
+
+    public function trends(array $filters = []): array
+    {
+        $rows = $this->applicationQuery($filters)->selectRaw($this->dateGroupExpression('year').' as label, count(*) as applications')->groupBy(DB::raw($this->dateGroupExpression('year')))->orderBy('label')->get();
+        return $rows->map(fn ($row): array => ['label' => $row->label, 'applications' => (int) $row->applications])->all();
+    }
+
+    public function loanSummary(array $filters = []): array
+    {
+        $query = DB::table('study_loan_applications')->when($filters['year'] ?? null, fn ($query, $year) => $query->whereYear('created_at', $year));
+        $total = (int) $query->count();
+        $approved = (int) (clone $query)->whereIn('status', ['approved', 'active', 'disbursed'])->count();
+        $rejected = (int) (clone $query)->whereIn('status', ['rejected', 'refused'])->count();
+        $amount = (float) (clone $query)->whereIn('status', ['approved', 'active', 'disbursed'])->sum('amount');
+        $remaining = (float) DB::table('study_loan_installments')->whereIn('status', ['pending', 'late'])->sum('amount');
+        return ['requested' => $total, 'approved' => $approved, 'rejected' => $rejected, 'active' => (int) (clone $query)->whereIn('status', ['active', 'disbursed'])->count(), 'amount_approved' => $amount, 'remaining' => $remaining, 'approval_rate' => $total ? round($approved / $total * 100, 2) : 0];
+    }
+
+    private function applicationBreakdown(string $groupId, string $groupLabel, array $filters, int $limit, bool $includeRegion): array
+    {
+        $status = "coalesce(applications.workflow_status, applications.status)";
+        return $this->applicationQuery($filters)->whereNotNull(DB::raw($groupId))->selectRaw("{$groupId} as id, {$groupLabel} as label, count(*) as applications, sum(case when {$status} in ('accepted','eligible','valide','approuve','awarded','committed','disbursed') then 1 else 0 end) as validated, sum(case when {$status} in ('rejected','rejete') then 1 else 0 end) as rejected")->groupBy(DB::raw($groupId), DB::raw($groupLabel))->orderByDesc('applications')->limit($limit)->get()->map(fn ($row): array => ['id' => $row->id, 'label' => $row->label ?: 'Non renseigné', 'applications' => (int) $row->applications, 'validated' => (int) $row->validated, 'rejected' => (int) $row->rejected, 'success_rate' => $row->applications ? round(((int) $row->validated / (int) $row->applications) * 100, 2) : 0])->all();
     }
 
     private function dateGroupExpression(string $period): string

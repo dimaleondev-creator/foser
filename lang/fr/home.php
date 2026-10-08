@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'description' => "FOSER, Fonds de Soutien à l'Éducation et à la Recherche du Burkina Faso.",
+    'title' => 'FOSER | Éducation, recherche et innovation',
+    'og_description' => 'Le service public qui accompagne les parcours, les savoirs et les solutions de demain.',
+    'contact' => 'Nous contacter',
+    'brand_description' => "Fonds de Soutien à l'Éducation et à la Recherche",
+    'menu_open' => 'Ouvrir le menu',
+    'nav_label' => 'Navigation principale',
+    'nav_home' => 'Accueil',
+    'nav_institution' => 'Le FOSER',
+    'nav_programs' => 'Nos programmes',
+    'nav_calls' => 'Appels à candidatures',
+    'nav_publications' => 'Publications',
+    'nav_register' => "S'inscrire",
+    'hero_eyebrow' => 'PORTAIL OFFICIEL · BURKINA FASO',
+    'hero_title' => "Financer l'avenir du Burkina Faso",
+    'hero_title_emphasis' => "par l'éducation et la recherche.",
+    'hero_copy' => 'Le FOSER soutient les étudiants, les chercheurs et les institutions dans leurs parcours académiques et scientifiques.',
+    'hero_programs' => 'Découvrir nos programmes',
+    'hero_about' => 'Comprendre notre mission',
+    'portal_label' => 'Accès aux espaces',
+    'portal_student' => 'Espace étudiant',
+    'portal_researcher' => 'Créer un compte chercheur',
+    'portal_university' => 'Espace université',
+    'hero_note' => 'Notre engagement',
+];

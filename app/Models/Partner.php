@@ -10,7 +10,7 @@ class Partner extends Model
 {
     use HasUuids, SoftDeletes;
 
-    protected $fillable = ['name', 'slug', 'logo_path', 'description', 'type', 'category', 'website_url', 'email', 'phone', 'sort_order', 'status', 'is_featured', 'starts_at', 'ends_at'];
+    protected $fillable = ['name', 'slug', 'logo_path', 'description', 'type', 'category', 'website_url', 'email', 'phone', 'sort_order', 'status', 'is_featured', 'display_location', 'starts_at', 'ends_at'];
 
     protected function casts(): array
     {

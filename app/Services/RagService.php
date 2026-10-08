@@ -19,6 +19,9 @@ class RagService
     public function answer(string $question): array
     {
         $normalized = Str::lower(trim($question));
+        if ($this->isPromptInjection($normalized)) {
+            return ['answer' => null, 'sources' => [], 'confidence' => 0, 'refused' => true, 'reason' => 'guardrail'];
+        }
         $tokens = collect(preg_split('/\s+/u', $normalized) ?: [])->filter(fn (string $token): bool => mb_strlen($token) >= 3)->values();
         if ($tokens->isEmpty()) return ['answer' => null, 'sources' => [], 'confidence' => 0, 'refused' => true];
 
@@ -46,5 +49,11 @@ class RagService
     private function records($query, string $title, string $excerpt, string $url): array
     {
         return $query->limit(100)->get()->map(fn ($record): array => ['title' => (string) $record->{$title}, 'excerpt' => (string) ($record->{$excerpt} ?? ''), 'url' => $url])->all();
+    }
+
+    private function isPromptInjection(string $question): bool
+    {
+        return collect(['ignore previous instructions', 'ignore all instructions', 'révèle les données privées', 'reveal private data', 'bypass security', 'ignore les règles', 'system prompt', 'instructions précédentes'])
+            ->contains(fn (string $pattern): bool => Str::contains($question, $pattern));
     }
 }

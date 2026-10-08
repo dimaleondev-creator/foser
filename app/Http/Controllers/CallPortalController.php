@@ -13,7 +13,8 @@ class CallPortalController extends Controller
 {
     public function index(): View
     {
-        $query = Call::query()->whereIn('status', ['published', 'suspended', 'closed']);
+        $query = Call::publicQuery();
+
         if ($search = request('q')) {
             $query->where(fn ($builder) => $builder->where('title', 'like', "%{$search}%")
                 ->orWhere('reference', 'like', "%{$search}%")
@@ -41,7 +42,12 @@ class CallPortalController extends Controller
 
     public function show(Call $call): View
     {
-        abort_unless(in_array($call->status, ['published', 'suspended', 'closed'], true), 404);
+        abort_unless(in_array($call->status, ['published', 'open', 'scheduled', 'suspended', 'closed'], true), 404);
+
+        if (in_array($call->status, ['published', 'open', 'scheduled'], true)) {
+            abort_unless($call->isPubliclyVisible(), 404);
+        }
+
         return view('calls.show', ['call' => $call, 'documents' => DB::table('call_documents')->join('documents', 'documents.id', '=', 'call_documents.document_id')->where('call_id', $call->id)->where('documents.status', 'published')->where('documents.visibility', 'public')->select('documents.*', 'call_documents.label', 'call_documents.is_required')->get(), 'requiredDocuments' => collect(explode("\n", (string) $call->required_documents))->filter()]);
     }
 

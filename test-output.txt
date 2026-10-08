@@ -1,0 +1,10 @@
+
+   PASS  Tests\Feature\PublicNewsAndCallsTest
+  ✓ only published news is public and searchable                        14.69s  
+  ✓ news published at current time is visible on its detail page         1.50s  
+  ✓ internal or scheduled news never appears on public pages             2.05s  
+  ✓ calls search description and preserve filters in pagination          1.93s  
+
+  Tests:    4 passed (19 assertions)
+  Duration: 22.61s
+

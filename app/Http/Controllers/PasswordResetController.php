@@ -18,8 +18,9 @@ class PasswordResetController extends Controller
     public function send(Request $request): RedirectResponse
     {
         $data = $request->validate(['email' => ['required', 'email']]);
-        $status = Password::sendResetLink($data);
-        return back()->with('status', __($status));
+        Password::sendResetLink($data);
+
+        return back()->with('status', 'Si un compte correspond à cette adresse, un lien de réinitialisation sera envoyé.');
     }
 
     public function form(Request $request, string $token): View

@@ -22,6 +22,31 @@ class PublicNewsAndCallsTest extends TestCase
         $this->get('/news/article-brouillon')->assertNotFound();
     }
 
+    public function test_news_published_at_current_time_is_visible_on_its_detail_page(): void
+    {
+        $this->travelTo(now());
+        News::create([
+            'title' => 'Actualité publiée maintenant',
+            'slug' => 'actualite-publiee-maintenant',
+            'body' => 'Contenu immédiatement public.',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->get('/news/actualite-publiee-maintenant')->assertOk()->assertSee('Contenu immédiatement public.');
+    }
+
+    public function test_internal_or_scheduled_news_never_appears_on_public_pages(): void
+    {
+        News::create(['title' => 'Actualité interne publiée', 'slug' => 'actualite-interne', 'body' => 'Interne', 'status' => 'published', 'visibility' => 'internal', 'published_at' => now()->subMinute()]);
+        News::create(['title' => 'Actualité planifiée', 'slug' => 'actualite-planifiee', 'body' => 'Futur', 'status' => 'published', 'published_at' => now()->addDay()]);
+
+        $this->get('/news')->assertOk()->assertDontSee('Actualité interne publiée')->assertDontSee('Actualité planifiée');
+        $this->get('/news/actualite-interne')->assertNotFound();
+        $this->get('/news/actualite-planifiee')->assertNotFound();
+        $this->get('/')->assertOk()->assertDontSee('Actualité interne publiée')->assertDontSee('Actualité planifiée');
+    }
+
     public function test_calls_search_description_and_preserve_filters_in_pagination(): void
     {
         $program = Program::create(['name' => 'Programme appels', 'code' => 'CALLS-TEST', 'type' => 'research', 'status' => 'published']);

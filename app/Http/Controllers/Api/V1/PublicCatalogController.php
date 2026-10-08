@@ -3,48 +3,96 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Event;
+use App\Models\Document;
+use App\Models\News;
 use App\Models\Partner;
 use App\Models\Testimonial;
+use App\Http\Resources\PublicDocumentResource;
+use App\Http\Resources\PublicEventResource;
+use App\Http\Resources\PublicNewsResource;
+use App\Http\Resources\PublicPartnerResource;
+use App\Http\Resources\PublicTestimonialResource;
+use App\Contracts\SearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PublicCatalogController
 {
+    public function news(Request $request): JsonResponse
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'min:2', 'max:100'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $news = News::query()->with('category')->where('status', 'published')->where('visibility', 'public')
+            ->whereNotNull('published_at')->where('published_at', '<=', now())
+            ->when($filters['q'] ?? null, fn ($query, string $term) => $query->where(fn ($search) => $search->where('title', 'like', "%{$term}%")->orWhere('excerpt', 'like', "%{$term}%")))
+            ->when($filters['category'] ?? null, fn ($query, string $slug) => $query->whereHas('category', fn ($category) => $category->where('slug', $slug)))
+            ->latest('published_at')->paginate($filters['per_page'] ?? 20)->withQueryString();
+
+        return response()->json(['data' => PublicNewsResource::collection($news->items()), 'meta' => $this->meta($news)]);
+    }
+
+    public function newsDetail(string $slug): JsonResponse
+    {
+        $news = News::query()->with('category')->where('slug', $slug)->where('status', 'published')->where('visibility', 'public')
+            ->whereNotNull('published_at')->where('published_at', '<=', now())->firstOrFail();
+
+        return response()->json(['data' => new PublicNewsResource($news)]);
+    }
+
+    public function documents(Request $request, SearchService $search): JsonResponse
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'min:2', 'max:100'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'language' => ['nullable', 'string', 'max:10'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $documents = Document::query()->with('category')->where('status', 'published')->where('visibility', 'public')
+            ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
+            ->when($filters['q'] ?? null, fn ($query, string $term) => $query->where(fn ($searchQuery) => $search
+                ->search($searchQuery, ['search' => $term], ['title', 'description', 'keywords', 'author', 'reference', 'document_type'])
+                ->orWhereHas('category', fn ($categoryQuery) => $categoryQuery->where('name', 'like', "%{$term}%"))))
+            ->when($filters['category'] ?? null, fn ($query, string $slug) => $query->whereHas('category', fn ($category) => $category->where('slug', $slug)))
+            ->when($filters['year'] ?? null, fn ($query, int $year) => $query->where('year', $year))
+            ->when($filters['language'] ?? null, fn ($query, string $language) => $query->where('language', $language))
+            ->latest('published_at')->paginate($filters['per_page'] ?? 20)->withQueryString();
+
+        return response()->json(['data' => PublicDocumentResource::collection($documents->items()), 'meta' => $this->meta($documents)]);
+    }
+
     public function events(Request $request): JsonResponse
     {
-        $events = Event::query()->published()->orderBy('starts_at')->paginate($this->perPage($request))->through(fn (Event $event): array => [
-            'id' => $event->id, 'title' => $event->title, 'slug' => $event->slug,
-            'description' => $event->description, 'category' => $event->category,
-            'venue' => $event->venue, 'starts_at' => $event->starts_at?->toISOString(),
-            'ends_at' => $event->ends_at?->toISOString(), 'image_url' => $event->image_path ? asset('storage/'.$event->image_path) : null,
-        ]);
-        return response()->json(['data' => $events->items(), 'meta' => $this->meta($events)]);
+        $filters = $request->validate(['q' => ['nullable', 'string', 'min:2', 'max:100'], 'category' => ['nullable', 'string', 'max:80'], 'page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', 'min:1', 'max:50']]);
+        $events = Event::query()->published()
+            ->when($filters['q'] ?? null, fn ($query, string $term) => $query->where(fn ($search) => $search->where('title', 'like', "%{$term}%")->orWhere('description', 'like', "%{$term}%")->orWhere('venue', 'like', "%{$term}%")))
+            ->when($filters['category'] ?? null, fn ($query, string $category) => $query->where('category', $category))
+            ->orderBy('starts_at')->paginate($filters['per_page'] ?? 20)->withQueryString();
+        return response()->json(['data' => PublicEventResource::collection($events->items())->resolve($request), 'meta' => $this->meta($events)]);
     }
 
     public function partners(Request $request): JsonResponse
     {
-        $partners = Partner::query()->where('status', 'published')->orderBy('sort_order')->orderBy('name')->paginate($this->perPage($request))->through(fn (Partner $partner): array => [
-            'id' => $partner->id, 'name' => $partner->name, 'slug' => $partner->slug,
-            'description' => $partner->description, 'type' => $partner->type, 'category' => $partner->category,
-            'website_url' => $partner->website_url, 'logo_url' => $partner->logo_path ? asset('storage/'.$partner->logo_path) : null,
-        ]);
-        return response()->json(['data' => $partners->items(), 'meta' => $this->meta($partners)]);
+        $filters = $request->validate(['q' => ['nullable', 'string', 'min:2', 'max:100'], 'category' => ['nullable', 'string', 'max:80'], 'page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', 'min:1', 'max:50']]);
+        $partners = Partner::query()->where('status', 'published')
+            ->when($filters['q'] ?? null, fn ($query, string $term) => $query->where(fn ($search) => $search->where('name', 'like', "%{$term}%")->orWhere('description', 'like', "%{$term}%")))
+            ->when($filters['category'] ?? null, fn ($query, string $category) => $query->where('category', $category))
+            ->orderBy('sort_order')->orderBy('name')->paginate($filters['per_page'] ?? 20)->withQueryString();
+        return response()->json(['data' => PublicPartnerResource::collection($partners->items())->resolve($request), 'meta' => $this->meta($partners)]);
     }
 
     public function testimonials(Request $request): JsonResponse
     {
-        $testimonials = Testimonial::query()->where('status', 'published')->where('consent_given', true)->whereNotNull('published_at')->where('published_at', '<=', now())->orderBy('sort_order')->paginate($this->perPage($request))->through(fn (Testimonial $testimonial): array => [
-            'id' => $testimonial->id, 'name' => $testimonial->display_name, 'job_title' => $testimonial->job_title,
-            'organization' => $testimonial->organization, 'body' => $testimonial->body, 'rating' => $testimonial->rating,
-            'photo_url' => $testimonial->photo_path ? asset('storage/'.$testimonial->photo_path) : null,
-            'published_at' => $testimonial->published_at?->toISOString(),
-        ]);
-        return response()->json(['data' => $testimonials->items(), 'meta' => $this->meta($testimonials)]);
-    }
-
-    private function perPage(Request $request): int
-    {
-        return min(max($request->integer('per_page', 20), 1), 50);
+        $filters = $request->validate(['q' => ['nullable', 'string', 'min:2', 'max:100'], 'page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', 'min:1', 'max:50']]);
+        $testimonials = Testimonial::query()->where('status', 'published')->where('consent_given', true)->whereNotNull('published_at')->where('published_at', '<=', now())
+            ->when($filters['q'] ?? null, fn ($query, string $term) => $query->where(fn ($search) => $search->where('first_name', 'like', "%{$term}%")->orWhere('last_name', 'like', "%{$term}%")->orWhere('organization', 'like', "%{$term}%")->orWhere('body', 'like', "%{$term}%")))
+            ->orderBy('sort_order')->paginate($filters['per_page'] ?? 20)->withQueryString();
+        return response()->json(['data' => PublicTestimonialResource::collection($testimonials->items())->resolve($request), 'meta' => $this->meta($testimonials)]);
     }
 
     private function meta($paginator): array

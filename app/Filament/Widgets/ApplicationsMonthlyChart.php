@@ -30,7 +30,7 @@ class ApplicationsMonthlyChart extends ChartWidget
         }
 
         try {
-            $counts = collect(app(DashboardStatisticsService::class)->charts(request()->only(['year', 'region', 'university_id', 'program_id', 'sex', 'status']), 100)['monthly'])->keyBy('label');
+            $counts = collect(app(DashboardStatisticsService::class)->charts(request()->only(['year', 'from', 'to', 'region', 'university_id', 'program_id', 'sex', 'status']), 100)['monthly'])->keyBy('label');
 
             foreach ($labels as $index => $label) {
                 $period = now()->subMonths(5 - $index)->format('Y-m');
